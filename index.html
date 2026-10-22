@@ -1939,115 +1939,20 @@
       }
       participants = [];
       window.participants = [];
+      window.lastLeaderboardData = [];
       if (AppState.user) {
         AppState.score = 0;
         AppState.stageSubmissions = {};
         saveState();
       }
       closeResetModal();
-      renderLeaderboardView();
+      renderLeaderboard([]);
       SoundFX.padlockClick();
     }
 
     /* ========================================================
        7. LEADERBOARD RENDERING & TICKER AUTO-SCROLL
        ======================================================== */
-    function getCombinedLeaderboard() {
-      let list = [...(window.participants || participants || [])];
-
-      if (AppState.user && Object.keys(AppState.stageSubmissions).length > 0) {
-        const totalTime = Object.values(AppState.stageSubmissions).reduce((acc, cur) => acc + (cur.timeTaken || 0), 0);
-        const userRecord = {
-          id: AppState.user.mobile || 'current-user',
-          name: AppState.user.name,
-          hospital: AppState.user.hospital,
-          mobile: AppState.user.mobile,
-          stagesCompleted: Object.keys(AppState.stageSubmissions).length,
-          score: AppState.score,
-          totalTimeTaken: totalTime,
-          timestamp: AppState.user.timestamp || new Date().toISOString(),
-          isCurrentUser: true
-        };
-
-        const uIdx = list.findIndex(p => p.isCurrentUser || (p.mobile && p.mobile === userRecord.mobile));
-        if (uIdx >= 0) {
-          list[uIdx] = userRecord;
-        } else {
-          list.push(userRecord);
-        }
-      }
-
-      // Sort primarily by Score (Descending), secondarily by Total Time (Ascending)
-      list.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return (a.totalTimeTaken || 0) - (b.totalTimeTaken || 0);
-      });
-
-      return list;
-    }
-
-    function renderLeaderboardView() {
-      const records = getCombinedLeaderboard();
-      const total = records.length;
-      const totalEl = document.getElementById('hud-total-delegates');
-      if (totalEl) totalEl.textContent = total;
-
-      const topScore = records.length > 0 ? `${records[0].score} Pts` : "0 Pts";
-      const hudMaxScore = document.getElementById('hud-max-score');
-      if (hudMaxScore) hudMaxScore.textContent = topScore;
-
-      const completedAll = records.filter(r => r.stagesCompleted === 5).length;
-      const compRate = total > 0 ? Math.round((completedAll / total) * 100) : 0;
-      const hudCompRate = document.getElementById('hud-completion-rate');
-      if (hudCompRate) hudCompRate.textContent = `${compRate}%`;
-
-      // Top 3 Podium
-      const podiumConfigs = [
-        { rank: 1, nameId: 'podium-name-1', hospId: 'podium-hospital-1', scoreId: 'podium-score-1', stgId: 'podium-stages-1' },
-        { rank: 2, nameId: 'podium-name-2', hospId: 'podium-hospital-2', scoreId: 'podium-score-2', stgId: 'podium-stages-2' },
-        { rank: 3, nameId: 'podium-name-3', hospId: 'podium-hospital-3', scoreId: 'podium-score-3', stgId: 'podium-stages-3' }
-      ];
-
-      podiumConfigs.forEach((cfg, idx) => {
-        const item = records[idx];
-        if (item) {
-          document.getElementById(cfg.nameId).textContent = item.name;
-          document.getElementById(cfg.hospId).textContent = item.hospital;
-          document.getElementById(cfg.scoreId).textContent = item.score;
-          document.getElementById(cfg.stgId).textContent = `${item.stagesCompleted}/5 Stages Done`;
-        } else {
-          document.getElementById(cfg.nameId).textContent = "Awaiting Submissions...";
-          document.getElementById(cfg.hospId).textContent = "Conference Floor";
-          document.getElementById(cfg.scoreId).textContent = "0";
-          document.getElementById(cfg.stgId).textContent = "0/5 Stages Done";
-        }
-      });
-
-      // Ticker / Roster Table: ALL records
-      const viewport = document.getElementById('ticker-viewport');
-      if (!viewport) return;
-
-      if (records.length === 0) {
-        viewport.innerHTML = '<div class="empty-roster" id="empty-roster" style="text-align: center; padding: 48px 16px; color: #94a3b8; font-size: 1.05rem;">Awaiting delegate submissions... Scan Quest 1 to begin!</div>';
-      } else {
-        let rowsHtml = '';
-        for (let i = 0; i < records.length; i++) {
-          const item = records[i];
-          const isUserClass = item.isCurrentUser ? 'style="background: rgba(14, 165, 233, 0.15); border-left: 3px solid #0ea5e9;"' : '';
-          rowsHtml += `
-            <div class="ticker-row leaderboard-row" ${isUserClass} data-rank="${i + 1}">
-              <span class="ticker-rank">#${i + 1}</span>
-              <span class="ticker-name">${escapeHtml(item.name)} ${item.isCurrentUser ? '⭐' : ''}</span>
-              <span class="ticker-hospital">${escapeHtml(item.hospital)}</span>
-              <span class="ticker-stages">${item.stagesCompleted}/5 🔓</span>
-              <span class="ticker-score">${item.score} pts</span>
-            </div>
-          `;
-        }
-        viewport.innerHTML = rowsHtml;
-      }
-    }
-
     function normalizeParticipant(p) {
       if (!p) return null;
       const name = p.name || (p.user && p.user.name) || "Delegate";
@@ -2069,39 +1974,126 @@
       };
     }
 
+    function renderLeaderboard(data) {
+      if (Array.isArray(data)) {
+        window.lastLeaderboardData = data;
+        window.participants = data;
+        participants = data;
+      } else if (Array.isArray(window.participants) && window.participants.length > 0) {
+        data = window.participants;
+      } else if (Array.isArray(participants) && participants.length > 0) {
+        data = participants;
+      } else {
+        data = window.lastLeaderboardData || [];
+      }
+
+      // Strictly normalize and render cloud data (no local AppState.user injection)
+      const records = data.map(normalizeParticipant).filter(Boolean);
+
+      // Sort primarily by Score (Descending), secondarily by Total Time Taken (Ascending)
+      records.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (a.totalTimeTaken || 0) - (b.totalTimeTaken || 0);
+      });
+
+      // 1. Update top stats counters
+      const total = records.length;
+      const totalEl = document.getElementById('hud-total-delegates');
+      if (totalEl) totalEl.textContent = total;
+
+      const topScore = records.length > 0 ? `${records[0].score} Pts` : "0 Pts";
+      const hudMaxScore = document.getElementById('hud-max-score');
+      if (hudMaxScore) hudMaxScore.textContent = topScore;
+
+      const completedAll = records.filter(r => r.stagesCompleted === 5).length;
+      const compRate = total > 0 ? Math.round((completedAll / total) * 100) : 0;
+      const hudCompRate = document.getElementById('hud-completion-rate');
+      if (hudCompRate) hudCompRate.textContent = `${compRate}%`;
+
+      // 2. Populate 🥇 Gold, 🥈 Silver, and 🥉 Bronze podium cards using data[0], data[1], and data[2]
+      const podiumConfigs = [
+        { rank: 1, nameId: 'podium-name-1', hospId: 'podium-hospital-1', scoreId: 'podium-score-1', stgId: 'podium-stages-1' },
+        { rank: 2, nameId: 'podium-name-2', hospId: 'podium-hospital-2', scoreId: 'podium-score-2', stgId: 'podium-stages-2' },
+        { rank: 3, nameId: 'podium-name-3', hospId: 'podium-hospital-3', scoreId: 'podium-score-3', stgId: 'podium-stages-3' }
+      ];
+
+      podiumConfigs.forEach((cfg, idx) => {
+        const item = records[idx];
+        const nameEl = document.getElementById(cfg.nameId);
+        const hospEl = document.getElementById(cfg.hospId);
+        const scoreEl = document.getElementById(cfg.scoreId);
+        const stgEl = document.getElementById(cfg.stgId);
+
+        if (item) {
+          if (nameEl) nameEl.textContent = item.name;
+          if (hospEl) hospEl.textContent = item.hospital;
+          if (scoreEl) scoreEl.textContent = item.score;
+          if (stgEl) stgEl.textContent = `${item.stagesCompleted}/5 Stages Done`;
+        } else {
+          if (nameEl) nameEl.textContent = "Awaiting Submissions...";
+          if (hospEl) hospEl.textContent = "Conference Floor";
+          if (scoreEl) scoreEl.textContent = "0";
+          if (stgEl) stgEl.textContent = "0/5 Stages Done";
+        }
+      });
+
+      // 3. Populate full table with all rows in data
+      const viewport = document.getElementById('ticker-viewport');
+      if (!viewport) return;
+
+      if (records.length === 0) {
+        viewport.innerHTML = '<div class="empty-roster" id="empty-roster" style="text-align: center; padding: 48px 16px; color: #94a3b8; font-size: 1.05rem;">Awaiting delegate submissions... Scan Quest 1 to begin!</div>';
+      } else {
+        let rowsHtml = '';
+        for (let i = 0; i < records.length; i++) {
+          const item = records[i];
+          rowsHtml += `
+            <div class="ticker-row leaderboard-row" data-rank="${i + 1}">
+              <span class="ticker-rank">#${i + 1}</span>
+              <span class="ticker-name">${escapeHtml(item.name)}</span>
+              <span class="ticker-hospital">${escapeHtml(item.hospital)}</span>
+              <span class="ticker-stages">${item.stagesCompleted}/5 🔓</span>
+              <span class="ticker-score">${item.score} pts</span>
+            </div>
+          `;
+        }
+        viewport.innerHTML = rowsHtml;
+      }
+    }
+
+    const renderLeaderboardView = renderLeaderboard;
+
     async function fetchCloudLeaderboard() {
       if (!CONFIG.WEBHOOK_URL) return;
       try {
-        const response = await fetch(CONFIG.WEBHOOK_URL);
-        if (!response.ok) return;
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          participants = data.map(normalizeParticipant).filter(Boolean);
-          window.participants = participants;
-          localStorage.setItem("participants", JSON.stringify(participants));
-          localStorage.setItem("kics_participants", JSON.stringify(participants));
-          renderLeaderboardView();
+        const res = await fetch(CONFIG.WEBHOOK_URL);
+        if (AppState.pollingStopped) return;
+        const data = await res.json();
+        if (Array.isArray(data) && !AppState.pollingStopped) {
+          renderLeaderboard(data); // Re-renders Podium and Table
         }
       } catch (err) {
-        console.warn("Leaderboard polling error:", err);
+        console.warn("Polling error:", err);
       }
     }
 
     function startLeaderboardPolling() {
+      AppState.pollingStopped = false;
       if (AppState.leaderboardPollInterval) clearInterval(AppState.leaderboardPollInterval);
       fetchCloudLeaderboard();
       AppState.leaderboardPollInterval = setInterval(fetchCloudLeaderboard, 5000);
     }
 
     function stopLeaderboardPolling() {
+      AppState.pollingStopped = true;
       if (AppState.leaderboardPollInterval) {
         clearInterval(AppState.leaderboardPollInterval);
         AppState.leaderboardPollInterval = null;
       }
     }
 
-    window.renderLeaderboard = renderLeaderboardView;
-    window.renderLeaderboardView = renderLeaderboardView;
+    window.renderLeaderboard = renderLeaderboard;
+    window.renderLeaderboardView = renderLeaderboard;
     window.openResetModal = openResetModal;
     window.closeResetModal = closeResetModal;
     window.clearLeaderboardData = clearLeaderboardData;
@@ -2198,10 +2190,18 @@
     }
 
     function exportCSV() {
-      const records = getCombinedLeaderboard();
+      const source = (window.lastLeaderboardData && window.lastLeaderboardData.length > 0)
+        ? window.lastLeaderboardData.map(normalizeParticipant).filter(Boolean)
+        : (participants || []).map(normalizeParticipant).filter(Boolean);
+
+      source.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (a.totalTimeTaken || 0) - (b.totalTimeTaken || 0);
+      });
+
       let csv = "Rank,Doctor Name,Hospital/Institution,Mobile,Stages Completed,Score,TimeTakenSeconds,Timestamp\n";
-      records.forEach((r, idx) => {
-        csv += `${idx + 1},"${r.name}","${r.hospital}","${r.mobile}",${r.stagesCompleted},${r.score},${r.totalTimeTaken || 0},"${r.timestamp}"\n`;
+      source.forEach((r, idx) => {
+        csv += `${idx + 1},"${r.name}","${r.hospital}","${r.mobile || ''}",${r.stagesCompleted},${r.score},${r.totalTimeTaken || 0},"${r.timestamp}"\n`;
       });
 
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -2792,7 +2792,7 @@
             });
           }
           if (window.location.hash === '#leaderboard') {
-            renderLeaderboardView();
+            fetchCloudLeaderboard();
           }
         }
       };

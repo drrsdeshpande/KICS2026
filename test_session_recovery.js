@@ -1,19 +1,24 @@
 /**
- * Automated Verification for Dual-Match Session Recovery in KICS 2026
+ * Automated Verification for Existing User Protection & Session Recovery in KICS 2026
  * 
  * Verifies:
- * 1. Dual Match Check (Phone OR Name):
- *    - Phone match: Strips non-digits from entered phone and matches cloud record.
- *    - Name match (when phone is empty): Matches by name when phone is not provided.
- * 2. Full State Re-hydration:
- *    - Restores AppState.score = match.score and AppState.totalTimeTaken = match.totalTimeTaken.
- *    - Sets completed stages up to match.stages (stages 1..N marked completed & locked).
- *    - Sets current active stage to match.stages + 1.
- *    - For match.stages === 3, sets active stage to 4, displaying the Day 2 locked padlock screen.
- *    - Saves restored state into localStorage.
- *    - Displays notification: "Welcome back, Dr. [Name]! Resuming at Stage [match.stages + 1] with [match.score] pts."
- * 3. Failsafe:
- *    - If cloud lookup times out (over 2 seconds) or fails, registration completes normally without blocking.
+ * 1. Intercept Registration Form Submission:
+ *    - Prevents default submit action.
+ *    - Does NOT dispatch POST request with score: 0 when user already exists.
+ *    - Reads entered phone number: cleanPhone = phoneInput.value.replace(/\D/g, '').
+ * 2. Check Cloud First (GET Request):
+ *    - Searches CONFIG.WEBHOOK_URL records for matching phone or name.
+ * 3. Branch Logic:
+ *    - Case A: Existing User Found (existing && existing.stages > 0):
+ *        * Do NOT send a POST request.
+ *        * Hydrate AppState (user, score, stagesCompleted, totalTimeTaken).
+ *        * Save AppState to localStorage.
+ *        * Display message: "Welcome back, Dr. " + existing.name + "! Progress restored: " + existing.stages + "/5 stages completed."
+ *        * If existing.stages === 3, show the Day 2 locked screen; otherwise advance to existing.stages + 1.
+ *    - Case B: New User:
+ *        * Initialize normal state (score: 0, stages: 0).
+ *        * Send initial POST to register row in Google Sheet.
+ *        * Open Stage 1.
  */
 
 const { chromium } = require('playwright');
@@ -22,7 +27,7 @@ const BASE_URL = 'http://localhost:8080';
 
 async function runSessionRecoveryTests() {
   console.log("============================================================");
-  console.log("TEST SUITE: DUAL-MATCH SESSION RECOVERY & RE-HYDRATION");
+  console.log("TEST SUITE: EXISTING USER PROTECTION & CLOUD RECOVERY");
   console.log("============================================================\n");
 
   const browser = await chromium.launch({ headless: true });
@@ -33,14 +38,19 @@ async function runSessionRecoveryTests() {
 
   try {
     // ------------------------------------------------------------
-    // TEST 1: SESSION RESTORATION BY PHONE NUMBER (2 STAGES SOLVED)
+    // TEST 1: EXISTING USER (match.stages = 2 -> NO POST, Stage 3)
     // ------------------------------------------------------------
     console.log("------------------------------------------------------------");
-    console.log("TEST 1: State Restoration by Phone (match.stages = 2 -> Stage 3)");
+    console.log("TEST 1: Existing User Found (Phone match, stages=2 -> NO POST dispatched, Stage 3)");
     console.log("------------------------------------------------------------");
 
     const ctx1 = await browser.newContext();
     const page1 = await ctx1.newPage();
+
+    let postDispatched1 = false;
+    page1.on('request', req => {
+      if (req.method() === 'POST') postDispatched1 = true;
+    });
 
     // Mock cloud webhook
     await page1.route('https://script.google.com/macros/s/**', async route => {
@@ -49,6 +59,7 @@ async function runSessionRecoveryTests() {
           {
             name: "Dr. Sandeep Shenoy",
             hospital: "Manipal Hospital Sarjapur Road",
+            phone: "+91 98450 11223",
             mobile: "+91 98450 11223",
             score: 1950,
             stages: 2,
@@ -87,6 +98,7 @@ async function runSessionRecoveryTests() {
     const restoredState1 = await page1.evaluate(() => {
       return {
         score: AppState.score,
+        stagesCompleted: AppState.stagesCompleted,
         totalTimeTaken: AppState.totalTimeTaken,
         currentStage: AppState.currentStage,
         unlockedStages: AppState.unlockedStages,
@@ -94,15 +106,17 @@ async function runSessionRecoveryTests() {
         stage2Submitted: AppState.stageSubmissions[2]?.submitted,
         stage3Submitted: AppState.stageSubmissions[3]?.submitted,
         userName: AppState.user?.name,
-        userMobile: AppState.user?.mobile
+        userPhone: AppState.user?.phone
       };
     });
 
     console.log(`  Restored Score: ${restoredState1.score} Pts (Expected: 1950)`);
+    console.log(`  Restored stagesCompleted: ${restoredState1.stagesCompleted} (Expected: 2)`);
     console.log(`  Restored Total Time Taken: ${restoredState1.totalTimeTaken}s (Expected: 25)`);
     console.log(`  Current Stage routed to: ${restoredState1.currentStage} (Expected: 3)`);
     console.log(`  Stage 1 completed: ${restoredState1.stage1Submitted}`);
     console.log(`  Stage 2 completed: ${restoredState1.stage2Submitted}`);
+    console.log(`  POST request dispatched during recovery: ${postDispatched1} (Expected: false)`);
 
     const toast1Text = await page1.evaluate(() => {
       const t = document.getElementById('session-recovery-toast');
@@ -110,8 +124,7 @@ async function runSessionRecoveryTests() {
       return (t ? t.textContent : "") || (p ? p.textContent : "");
     });
     console.log(`  Recovery Toast Text: '${toast1Text}'`);
-    const expectedToast1 = "Welcome back, Dr. Sandeep Shenoy! Resuming at Stage 3 with 1950 pts.";
-    const toast1Matches = toast1Text.includes("Welcome back, Dr. Sandeep Shenoy! Resuming at Stage 3 with 1950 pts.");
+    const toast1Matches = toast1Text.includes("Welcome back, Dr. Sandeep Shenoy! Progress restored: 2/5 stages completed.");
 
     const localSaved1 = await page1.evaluate(() => {
       const raw = localStorage.getItem("kics_app_state");
@@ -122,7 +135,9 @@ async function runSessionRecoveryTests() {
 
     test1Pass = (
       modal1Hidden &&
+      !postDispatched1 &&
       restoredState1.score === 1950 &&
+      restoredState1.stagesCompleted === 2 &&
       restoredState1.totalTimeTaken === 25 &&
       restoredState1.currentStage === 3 &&
       restoredState1.stage1Submitted &&
@@ -136,14 +151,19 @@ async function runSessionRecoveryTests() {
     await ctx1.close();
 
     // ------------------------------------------------------------
-    // TEST 2: DUAL MATCH BY NAME WHEN PHONE IS EMPTY (3 STAGES SOLVED)
+    // TEST 2: EXISTING USER (match.stages = 3 -> NO POST, Day 2 Lock)
     // ------------------------------------------------------------
     console.log("\n------------------------------------------------------------");
-    console.log("TEST 2: State Restoration by Name (Phone Empty, match.stages = 3 -> Stage 4 Locked)");
+    console.log("TEST 2: Existing User Found (Name match, stages=3 -> NO POST, Day 2 Locked Screen)");
     console.log("------------------------------------------------------------");
 
     const ctx2 = await browser.newContext();
     const page2 = await ctx2.newPage();
+
+    let postDispatched2 = false;
+    page2.on('request', req => {
+      if (req.method() === 'POST') postDispatched2 = true;
+    });
 
     await page2.route('https://script.google.com/macros/s/**', async route => {
       if (route.request().method() === 'GET') {
@@ -151,6 +171,7 @@ async function runSessionRecoveryTests() {
           {
             name: "Dr. Anita Desai",
             hospital: "Apollo Hospitals Bengaluru",
+            phone: "+91 99887 76655",
             mobile: "+91 99887 76655",
             score: 2900,
             stages: 3,
@@ -189,6 +210,7 @@ async function runSessionRecoveryTests() {
     const restoredState2 = await page2.evaluate(() => {
       return {
         score: AppState.score,
+        stagesCompleted: AppState.stagesCompleted,
         totalTimeTaken: AppState.totalTimeTaken,
         currentStage: AppState.currentStage,
         unlockedStages: AppState.unlockedStages,
@@ -200,10 +222,9 @@ async function runSessionRecoveryTests() {
     });
 
     console.log(`  Restored Score: ${restoredState2.score} Pts (Expected: 2900)`);
-    console.log(`  Restored Total Time Taken: ${restoredState2.totalTimeTaken}s (Expected: 45)`);
+    console.log(`  Restored stagesCompleted: ${restoredState2.stagesCompleted} (Expected: 3)`);
     console.log(`  Current Stage routed to: ${restoredState2.currentStage} (Expected: 4)`);
-    console.log(`  Stages 1, 2, 3 submitted: ${restoredState2.stage1Submitted && restoredState2.stage2Submitted && restoredState2.stage3Submitted}`);
-    console.log(`  Stage 4 submitted: ${restoredState2.stage4Submitted || false} (Expected: false)`);
+    console.log(`  POST request dispatched during recovery: ${postDispatched2} (Expected: false)`);
 
     // Verify Stage 4 is in Locked View (Day 2 locked padlock screen)
     const st4CardVisible = await page2.isVisible("#stage-card-4");
@@ -223,8 +244,7 @@ async function runSessionRecoveryTests() {
       return (t ? t.textContent : "") || (p ? p.textContent : "");
     });
     console.log(`  Recovery Toast Text: '${toast2Text}'`);
-    const expectedToast2 = "Welcome back, Dr. Anita Desai! Resuming at Stage 4 with 2900 pts.";
-    const toast2Matches = toast2Text.includes("Welcome back, Dr. Anita Desai! Resuming at Stage 4 with 2900 pts.");
+    const toast2Matches = toast2Text.includes("Welcome back, Dr. Anita Desai! Progress restored: 3/5 stages completed.");
 
     const localSaved2 = await page2.evaluate(() => {
       const raw = localStorage.getItem("kics_app_state");
@@ -235,7 +255,9 @@ async function runSessionRecoveryTests() {
 
     test2Pass = (
       modal2Hidden &&
+      !postDispatched2 &&
       restoredState2.score === 2900 &&
+      restoredState2.stagesCompleted === 3 &&
       restoredState2.totalTimeTaken === 45 &&
       restoredState2.currentStage === 4 &&
       restoredState2.stage1Submitted &&
@@ -254,40 +276,53 @@ async function runSessionRecoveryTests() {
     await ctx2.close();
 
     // ------------------------------------------------------------
-    // TEST 3: FAILSAFE ON TIMEOUT / NETWORK ERROR (USER NEVER BLOCKED)
+    // TEST 3: NEW USER REGISTRATION (Initial POST Dispatched, Stage 1)
     // ------------------------------------------------------------
     console.log("\n------------------------------------------------------------");
-    console.log("TEST 3: Failsafe on Timeout / Network Error (User Never Blocked)");
+    console.log("TEST 3: New User Registration (Case B: Initial POST Dispatched, Stage 1 Open)");
     console.log("------------------------------------------------------------");
 
     const ctx3 = await browser.newContext();
     const page3 = await ctx3.newPage();
 
-    // Route webhook to simulate a hanging connection (>3500ms delay, exceeds 2s timeout)
+    let postDispatched3 = false;
+    let initialPostPayload = null;
+    page3.on('request', req => {
+      if (req.method() === 'POST') {
+        postDispatched3 = true;
+        try {
+          initialPostPayload = JSON.parse(req.postData());
+        } catch (_) {}
+      }
+    });
+
+    // Cloud returns empty roster (new user)
     await page3.route('https://script.google.com/macros/s/**', async route => {
-      await new Promise(r => setTimeout(r, 4000));
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([])
-      });
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([])
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'success' })
+        });
+      }
     });
 
     await page3.goto(`${BASE_URL}/#hunt`);
     await page3.waitForTimeout(300);
 
-    console.log("  Submitting registration with slow network connection (>2s)...");
-    const tStart = Date.now();
-    await page3.fill('#reg-name', 'Dr. Failsafe Tester');
-    await page3.fill('#reg-hospital', 'Emergency Hospital');
-    await page3.fill('#playerPhone', '9111122222');
+    console.log("  Submitting fresh registration for new user...");
+    await page3.fill('#reg-name', 'Dr. Brand New Delegate');
+    await page3.fill('#reg-hospital', 'Fortis Hospital');
+    await page3.fill('#playerPhone', '9123456780');
 
     await page3.click('#btn-start-hunt');
-
-    // Wait up to 2.5s for failsafe to fire and proceed with fresh registration
-    await page3.waitForTimeout(2500);
-    const elapsedMs = Date.now() - tStart;
-    console.log(`  Registration processed in ${elapsedMs}ms (Failsafe timeout is 2000ms)`);
+    await page3.waitForTimeout(600);
 
     const modal3Hidden = !(await page3.isVisible('#registration-modal'));
     const freshUser = await page3.evaluate(() => AppState.user);
@@ -295,11 +330,20 @@ async function runSessionRecoveryTests() {
     const freshStage = await page3.evaluate(() => AppState.currentStage);
 
     console.log(`  Registration modal dismissed: ${modal3Hidden}`);
+    console.log(`  Initial POST dispatched: ${postDispatched3} (Expected: true)`);
+    console.log(`  POST Payload: score=${initialPostPayload?.score}, stages=${initialPostPayload?.stages}, phone=${initialPostPayload?.phone}`);
     console.log(`  User registered successfully: '${freshUser?.name}'`);
     console.log(`  Score is initialized fresh: ${freshScore} Pts`);
     console.log(`  Current stage is Quest 1: ${freshStage}`);
 
-    test3Pass = (modal3Hidden && freshUser?.name === 'Dr. Failsafe Tester' && freshScore === 0 && freshStage === 1);
+    test3Pass = (
+      modal3Hidden &&
+      postDispatched3 &&
+      initialPostPayload?.score === 0 &&
+      freshUser?.name === 'Dr. Brand New Delegate' &&
+      freshScore === 0 &&
+      freshStage === 1
+    );
     console.log(`  Test 3 Result: ${test3Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
 
     await ctx3.close();
@@ -308,15 +352,15 @@ async function runSessionRecoveryTests() {
     // SUMMARY
     // ------------------------------------------------------------
     console.log("\n============================================================");
-    console.log("SESSION RECOVERY AUDIT SUMMARY");
+    console.log("SESSION RECOVERY & USER PROTECTION AUDIT SUMMARY");
     console.log("============================================================");
-    console.log(`  Test 1: Phone Match Restoration & Routing (N=2 -> Stage 3)     : ${test1Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
-    console.log(`  Test 2: Name Match Restoration (Phone Empty, N=3 -> Day 2 Lock): ${test2Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
-    console.log(`  Test 3: Failsafe Timeout & Non-Blocking Fallback               : ${test3Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
+    console.log(`  Test 1: Existing User Found (stages=2 -> NO POST, Stage 3)     : ${test1Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
+    console.log(`  Test 2: Existing User Found (stages=3 -> NO POST, Day 2 Lock)  : ${test2Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
+    console.log(`  Test 3: New User Registration (Initial POST Dispatched, Stage 1): ${test3Pass ? 'PASSED ✅' : 'FAILED ❌'}`);
     console.log("============================================================");
 
     if (test1Pass && test2Pass && test3Pass) {
-      console.log("🎉 ALL SESSION RECOVERY TESTS PASSED (100% SUCCESS)!\n");
+      console.log("🎉 ALL EXISTING USER PROTECTION TESTS PASSED (100% SUCCESS)!\n");
     } else {
       console.log("❌ Some session recovery tests failed.\n");
       process.exit(1);

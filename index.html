@@ -1070,6 +1070,23 @@
     </div>
   </div>
 
+  <!-- Reset Leaderboard Confirmation Modal -->
+  <div id="reset-confirm-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: center; max-width: 420px;">
+      <div class="modal-header">
+        <div style="font-size: 42px; margin-bottom: 8px;">⚠️</div>
+        <h2 id="reset-confirm-title" style="color: #f43f5e; font-size: 1.3rem;">Clear all leaderboard data?</h2>
+        <p id="reset-confirm-desc" style="color: #94a3b8; font-size: 0.88rem; margin-top: 8px;">
+          This will permanently remove all delegate submissions and scores from the live leaderboard.
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 18px;">
+        <button type="button" class="btn-ghost" id="btn-reset-cancel" style="flex: 1; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; cursor: pointer;">Cancel</button>
+        <button type="button" class="action-btn" id="btn-reset-confirm" style="flex: 1; margin: 0; padding: 12px; background: #e11d48; border-color: #f43f5e; box-shadow: 0 4px 15px rgba(225, 29, 72, 0.4);">Confirm Reset</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Mobile Delegate Interface -->
   <main id="delegate-view" class="container">
     <!-- QR Code / URL Auto-Unlock Notification -->
@@ -1515,6 +1532,10 @@
           <span>📥</span>
           <span>Export CSV</span>
         </button>
+        <button id="btn-reset-leaderboard" class="hud-btn" title="Presenter shortcut: Shift + X" style="background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.4); color: #f43f5e;">
+          <span>🗑️</span>
+          <span>Reset Leaderboard</span>
+        </button>
       </div>
     </div>
 
@@ -1591,7 +1612,8 @@
       isFrozen: false,
       scrollInterval: null,
       scrollPos: 0,
-      targetLockedStage: 2
+      targetLockedStage: 2,
+      leaderboardPollInterval: null
     };
 
     const syncChannel = new BroadcastChannel("kics_sync");
@@ -1723,6 +1745,14 @@
           }
           AppState.score = totalScore;
         }
+
+        const storedParticipants = localStorage.getItem("participants") || localStorage.getItem("kics_participants");
+        if (storedParticipants) {
+          participants = JSON.parse(storedParticipants);
+        } else {
+          participants = [];
+        }
+        window.participants = participants;
       } catch (e) {
         console.error("Storage load error:", e);
       }
@@ -1756,23 +1786,33 @@
           timestamp: new Date().toISOString()
         });
 
-        if (CONFIG.WEBHOOK_URL && AppState.user) {
-          fetch(CONFIG.WEBHOOK_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user: AppState.user,
-              score: AppState.score,
-              stages: submittedCount,
-              totalTimeTaken: totalElapsed,
-              timestamp: new Date().toISOString()
-            })
-          }).catch(() => {});
-        }
+        pushDelegateToCloud();
       } catch (e) {
         console.error("Storage save error:", e);
       }
+    }
+
+    function pushDelegateToCloud() {
+      if (!CONFIG.WEBHOOK_URL || !AppState.user) return;
+      const submittedCount = Object.keys(AppState.stageSubmissions).length;
+      let totalElapsed = 0;
+      for (const s in AppState.stageSubmissions) {
+        totalElapsed += (AppState.stageSubmissions[s].timeTaken || 0);
+      }
+      fetch(CONFIG.WEBHOOK_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user: AppState.user,
+          score: AppState.score,
+          stages: submittedCount,
+          totalTimeTaken: totalElapsed,
+          timestamp: new Date().toISOString()
+        })
+      }).catch(err => {
+        console.warn("Cloud push error (network may be offline):", err);
+      });
     }
 
     /* ========================================================
@@ -1880,6 +1920,35 @@
       }
     }
 
+    function openResetModal() {
+      const modal = document.getElementById('reset-confirm-modal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeResetModal() {
+      const modal = document.getElementById('reset-confirm-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function clearLeaderboardData() {
+      try {
+        localStorage.removeItem('participants');
+        localStorage.removeItem('kics_participants');
+      } catch (e) {
+        console.error("Storage clear error:", e);
+      }
+      participants = [];
+      window.participants = [];
+      if (AppState.user) {
+        AppState.score = 0;
+        AppState.stageSubmissions = {};
+        saveState();
+      }
+      closeResetModal();
+      renderLeaderboardView();
+      SoundFX.padlockClick();
+    }
+
     /* ========================================================
        7. LEADERBOARD RENDERING & TICKER AUTO-SCROLL
        ======================================================== */
@@ -1959,7 +2028,7 @@
       if (!viewport) return;
 
       if (records.length === 0) {
-        viewport.innerHTML = '<div class="empty-roster" id="empty-roster" style="text-align: center; padding: 48px 16px; color: #94a3b8; font-size: 1.05rem;">No participants have submitted yet. Complete Stage 1 to appear on the live leaderboard!</div>';
+        viewport.innerHTML = '<div class="empty-roster" id="empty-roster" style="text-align: center; padding: 48px 16px; color: #94a3b8; font-size: 1.05rem;">Awaiting delegate submissions... Scan Quest 1 to begin!</div>';
       } else {
         let rowsHtml = '';
         for (let i = 0; i < records.length; i++) {
@@ -1979,8 +2048,66 @@
       }
     }
 
+    function normalizeParticipant(p) {
+      if (!p) return null;
+      const name = p.name || (p.user && p.user.name) || "Delegate";
+      const hospital = p.hospital || (p.user && p.user.hospital) || "Hospital";
+      const mobile = p.mobile || (p.user && p.user.mobile) || "";
+      const score = typeof p.score === 'number' ? p.score : parseInt(p.score || 0, 10);
+      const stages = typeof p.stages === 'number' ? p.stages : (typeof p.stagesCompleted === 'number' ? p.stagesCompleted : parseInt(p.stages || 0, 10));
+      const totalTimeTaken = typeof p.totalTimeTaken === 'number' ? p.totalTimeTaken : parseInt(p.totalTimeTaken || 0, 10);
+      const timestamp = p.timestamp || (p.user && p.user.timestamp) || new Date().toISOString();
+      return {
+        id: mobile || name,
+        name,
+        hospital,
+        mobile,
+        score: isNaN(score) ? 0 : score,
+        stagesCompleted: isNaN(stages) ? 0 : stages,
+        totalTimeTaken: isNaN(totalTimeTaken) ? 0 : totalTimeTaken,
+        timestamp
+      };
+    }
+
+    async function fetchCloudLeaderboard() {
+      if (!CONFIG.WEBHOOK_URL) return;
+      try {
+        const response = await fetch(CONFIG.WEBHOOK_URL);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          participants = data.map(normalizeParticipant).filter(Boolean);
+          window.participants = participants;
+          localStorage.setItem("participants", JSON.stringify(participants));
+          localStorage.setItem("kics_participants", JSON.stringify(participants));
+          renderLeaderboardView();
+        }
+      } catch (err) {
+        console.warn("Leaderboard polling error:", err);
+      }
+    }
+
+    function startLeaderboardPolling() {
+      if (AppState.leaderboardPollInterval) clearInterval(AppState.leaderboardPollInterval);
+      fetchCloudLeaderboard();
+      AppState.leaderboardPollInterval = setInterval(fetchCloudLeaderboard, 5000);
+    }
+
+    function stopLeaderboardPolling() {
+      if (AppState.leaderboardPollInterval) {
+        clearInterval(AppState.leaderboardPollInterval);
+        AppState.leaderboardPollInterval = null;
+      }
+    }
+
     window.renderLeaderboard = renderLeaderboardView;
     window.renderLeaderboardView = renderLeaderboardView;
+    window.openResetModal = openResetModal;
+    window.closeResetModal = closeResetModal;
+    window.clearLeaderboardData = clearLeaderboardData;
+    window.fetchCloudLeaderboard = fetchCloudLeaderboard;
+    window.startLeaderboardPolling = startLeaderboardPolling;
+    window.stopLeaderboardPolling = stopLeaderboardPolling;
 
     function startAutoScroll() {
       if (AppState.scrollInterval) clearInterval(AppState.scrollInterval);
@@ -2353,10 +2480,12 @@
         document.getElementById('registration-modal').style.display = 'none';
         renderLeaderboardView();
         startAutoScroll();
+        startLeaderboardPolling();
       } else {
         delegateView.style.display = 'block';
         leaderboardView.style.display = 'none';
         btnViewToggle.classList.remove('active');
+        stopLeaderboardPolling();
         if (!AppState.user) {
           document.getElementById('registration-modal').style.display = 'flex';
         }
@@ -2379,7 +2508,10 @@
           return;
         }
 
-        if (e.key === 'f' || e.key === 'F') {
+        if (e.shiftKey && (e.key === 'X' || e.key === 'x')) {
+          e.preventDefault();
+          openResetModal();
+        } else if (e.key === 'f' || e.key === 'F') {
           e.preventDefault();
           toggleFreeze();
         } else if (e.key === 'c' || e.key === 'C') {
@@ -2480,6 +2612,7 @@
           ensureStageTimer(1);
           SoundFX.successChord();
           saveState();
+          pushDelegateToCloud();
           updateUI();
         }
       });
@@ -2616,6 +2749,12 @@
       document.getElementById('btn-freeze-toggle').addEventListener('click', toggleFreeze);
       document.getElementById('btn-confetti').addEventListener('click', launchConfetti);
       document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+      document.getElementById('btn-reset-leaderboard').addEventListener('click', openResetModal);
+      document.getElementById('btn-reset-cancel').addEventListener('click', closeResetModal);
+      document.getElementById('btn-reset-confirm').addEventListener('click', clearLeaderboardData);
+      document.getElementById('reset-confirm-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'reset-confirm-modal') closeResetModal();
+      });
       document.getElementById('btn-back-to-hunt').addEventListener('click', () => {
         window.location.hash = '#hunt';
       });

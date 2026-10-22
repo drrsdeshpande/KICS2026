@@ -1,0 +1,2669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>KICS 2026 • Critical Care Treasure Hunt</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩺</text></svg>">
+  <style>
+    :root {
+      --bg-dark: #0a0f1d;
+      --bg-card: #131b2e;
+      --bg-card-hover: #1c2742;
+      --border-color: #23314f;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-cyan: #0ea5e9;
+      --accent-cyan-glow: rgba(14, 165, 233, 0.25);
+      --accent-amber: #f59e0b;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    /* Top Navigation Bar */
+    header.app-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(10, 15, 29, 0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 15px var(--accent-cyan-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--accent-cyan);
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover, .icon-btn.active {
+      color: #fff;
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    .score-badge {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.1));
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fbbf24;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Container */
+    .container {
+      width: 100%;
+      max-width: 580px;
+      margin: 0 auto;
+      padding: 16px 16px 100px 16px;
+    }
+
+    /* Stepper Bar */
+    .stepper-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 10px 12px;
+      gap: 6px;
+      overflow-x: auto;
+    }
+
+    .step-node {
+      flex: 1;
+      min-width: 56px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+    }
+
+    .step-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1e293b;
+      border: 2px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      transition: all 0.25s ease;
+    }
+
+    .step-node.active .step-circle {
+      border-color: var(--accent-cyan);
+      color: #fff;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 12px var(--accent-cyan-glow);
+    }
+
+    .step-node.completed-correct .step-circle {
+      border-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.25);
+      color: var(--accent-emerald);
+    }
+
+    .step-node.completed-incorrect .step-circle {
+      border-color: var(--accent-rose);
+      background: rgba(244, 63, 94, 0.2);
+      color: var(--accent-rose);
+    }
+
+    .step-node.locked .step-circle {
+      opacity: 0.6;
+    }
+
+    .step-label {
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .step-node.active .step-label {
+      color: var(--accent-cyan);
+    }
+
+    /* Auto-Unlock Notification Pill */
+    #auto-unlock-pill {
+      display: none;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+      border: 1px solid var(--accent-emerald);
+      color: #a7f3d0;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 16px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      text-align: center;
+      animation: fadeIn 0.4s ease;
+    }
+
+    /* Stage Content Cards */
+    .stage-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      margin-bottom: 24px;
+    }
+
+    .stage-card-header {
+      padding: 16px 20px;
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.6), rgba(19, 27, 46, 0.6));
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stage-pill {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(14, 165, 233, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(14, 165, 233, 0.3);
+    }
+
+    .stage-pill.status-locked {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+
+    .stage-pill.status-done {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .stage-pill.status-zero {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+
+    .stage-card-body {
+      padding: 20px;
+    }
+
+    .stage-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .stage-question {
+      font-size: 15px;
+      color: #cbd5e1;
+      margin-bottom: 18px;
+      line-height: 1.6;
+    }
+
+    .media-container {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      background: #000;
+      margin-bottom: 20px;
+    }
+
+    .media-container img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .media-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 8px 12px;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.88));
+      font-size: 12px;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+
+    /* Live Speed & Scoring HUD */
+    .speed-score-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 8px 14px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .speed-timer {
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .potential-pts {
+      color: var(--accent-amber);
+      font-weight: 700;
+    }
+
+    .attempt-notice {
+      font-size: 12px;
+      color: var(--accent-amber);
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* MCQ Option Cards */
+    .mcq-options-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .mcq-label {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-color);
+      color: #e2e8f0;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .mcq-label:hover:not(.locked) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+      transform: translateY(-1px);
+    }
+
+    .mcq-radio {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid #64748b;
+      outline: none;
+      background: #0f172a;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .mcq-radio:checked {
+      border-color: var(--accent-cyan);
+      background: radial-gradient(circle, var(--accent-cyan) 45%, #0f172a 50%);
+    }
+
+    .mcq-label.selected {
+      background: rgba(14, 165, 233, 0.18);
+      border-color: var(--accent-cyan);
+      color: #fff;
+      box-shadow: 0 0 14px var(--accent-cyan-glow);
+    }
+
+    .mcq-label.correct {
+      background: rgba(16, 185, 129, 0.25) !important;
+      border-color: var(--accent-emerald) !important;
+      color: #fff !important;
+    }
+
+    .mcq-label.wrong {
+      background: rgba(244, 63, 94, 0.2) !important;
+      border-color: var(--accent-rose) !important;
+      color: #fecdd3 !important;
+    }
+
+    .mcq-label.locked {
+      cursor: default;
+      opacity: 0.85;
+    }
+
+    .option-letter {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      flex-shrink: 0;
+    }
+
+    .action-btn {
+      width: 100%;
+      padding: 15px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .action-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #38bdf8, #1d4ed8);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Graded Feedback Banners */
+    .graded-banner {
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 18px;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .graded-banner.banner-correct {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .graded-banner.banner-correct h4 {
+      color: var(--accent-emerald);
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .graded-banner.banner-incorrect {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+    }
+
+    .graded-banner.banner-incorrect h4 {
+      color: var(--accent-rose);
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .graded-banner p {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+
+    /* Padlock Modal / Locked State */
+    .locked-view {
+      text-align: center;
+      padding: 30px 16px;
+    }
+
+    .lock-icon-wrapper {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(244, 63, 94, 0.12);
+      border: 2px solid rgba(244, 63, 94, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 16px auto;
+      animation: pulseLock 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseLock {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(244, 63, 94, 0); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(244, 63, 94, 0.3); }
+    }
+
+    .lock-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .lock-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 380px;
+      margin: 0 auto 20px auto;
+    }
+
+    .passcode-form {
+      max-width: 340px;
+      margin: 0 auto;
+    }
+
+    .passcode-input-wrapper {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .passcode-input {
+      width: 100%;
+      padding: 14px 18px;
+      background: #0a0f1d;
+      border: 2px solid var(--border-color);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      font-family: monospace, inherit;
+      outline: none;
+      transition: all 0.25s;
+    }
+
+    .passcode-input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 15px var(--accent-cyan-glow);
+    }
+
+    .passcode-input.error {
+      border-color: var(--accent-rose);
+      animation: shake 0.4s ease;
+    }
+
+    .error-msg {
+      font-size: 12px;
+      color: var(--accent-rose);
+      margin-top: 6px;
+      font-weight: 600;
+      min-height: 18px;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    /* Registration Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(4, 7, 15, 0.88);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 440px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-header {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .modal-header h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .modal-header p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 13px 15px;
+      background: #0a0f1d;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan-glow);
+    }
+
+    .form-input:disabled {
+      opacity: 0.6;
+      background: #111827;
+      cursor: not-allowed;
+    }
+
+    /* =========================================
+       Auditorium Projector View (#leaderboard)
+       ========================================= */
+    #leaderboard-view {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% 10%, #1e293b 0%, #0a0f1d 75%);
+      padding: 24px 32px 60px 32px;
+    }
+
+    .stage-header {
+      text-align: center;
+      margin-bottom: 28px;
+      position: relative;
+    }
+
+    .stage-subtitle {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .stage-title-text {
+      font-size: 38px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(14, 165, 233, 0.4);
+    }
+
+    .presenter-hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: rgba(19, 27, 46, 0.8);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 12px 20px;
+      margin-bottom: 28px;
+    }
+
+    .hud-stats {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .hud-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .hud-stat-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .hud-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hud-btn {
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid var(--border-color);
+      background: #1e293b;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .hud-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    .hud-btn.active-freeze {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: var(--accent-rose);
+      color: #fecdd3;
+    }
+
+    /* Top 3 Podium */
+    .podium-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-bottom: 34px;
+      max-width: 1100px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .podium-card {
+      background: linear-gradient(180deg, #19233c 0%, #101726 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px 18px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      transition: transform 0.3s ease;
+    }
+
+    .podium-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .podium-card.rank-1 {
+      border-color: rgba(245, 158, 11, 0.8);
+      box-shadow: 0 0 35px rgba(245, 158, 11, 0.25);
+      order: 2;
+      transform: scale(1.05);
+    }
+
+    .podium-card.rank-2 {
+      border-color: rgba(203, 213, 225, 0.6);
+      box-shadow: 0 0 25px rgba(203, 213, 225, 0.15);
+      order: 1;
+    }
+
+    .podium-card.rank-3 {
+      border-color: rgba(180, 83, 9, 0.6);
+      box-shadow: 0 0 25px rgba(180, 83, 9, 0.15);
+      order: 3;
+    }
+
+    .trophy-badge {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      margin: 0 auto 12px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+
+    .rank-1 .trophy-badge {
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+    }
+
+    .rank-2 .trophy-badge {
+      background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+      box-shadow: 0 0 15px rgba(203, 213, 225, 0.4);
+    }
+
+    .rank-3 .trophy-badge {
+      background: linear-gradient(135deg, #d97706, #78350f);
+      box-shadow: 0 0 15px rgba(180, 83, 9, 0.4);
+    }
+
+    .podium-name {
+      font-size: 19px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .podium-hospital {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .podium-score {
+      font-size: 26px;
+      font-weight: 900;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .podium-stages {
+      font-size: 12px;
+      color: var(--accent-emerald);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* Auto-scrolling Ticker / Table */
+    .ticker-wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .ticker-header {
+      display: grid;
+      grid-template-columns: 80px 1.5fr 1.5fr 100px 100px;
+      padding: 14px 20px;
+      background: rgba(30, 41, 59, 0.8);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .ticker-viewport {
+      max-height: 440px;
+      overflow-y: auto;
+      position: relative;
+      scroll-behavior: smooth;
+    }
+
+    .ticker-viewport::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .ticker-viewport::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+
+    .ticker-row {
+      display: grid;
+      grid-template-columns: 80px 1.5fr 1.5fr 100px 100px;
+      padding: 14px 20px;
+      align-items: center;
+      border-bottom: 1px solid rgba(35, 49, 79, 0.5);
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .ticker-row:hover {
+      background: rgba(30, 41, 59, 0.4);
+    }
+
+    .ticker-rank {
+      font-weight: 800;
+      color: var(--accent-cyan);
+    }
+
+    .ticker-name {
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .ticker-hospital {
+      color: var(--text-muted);
+    }
+
+    .ticker-stages {
+      font-weight: 600;
+      color: var(--accent-emerald);
+    }
+
+    .ticker-score {
+      font-weight: 800;
+      color: #fbbf24;
+      text-align: right;
+    }
+
+    /* Confetti Canvas */
+    #confetti-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      .podium-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .podium-card.rank-1 { order: 1; transform: none; }
+      .podium-card.rank-2 { order: 2; }
+      .podium-card.rank-3 { order: 3; }
+      .stage-title-text { font-size: 26px; }
+      .ticker-header, .ticker-row {
+        grid-template-columns: 50px 1fr 70px 70px;
+      }
+      .ticker-hospital { display: none; }
+      #leaderboard-view { padding: 16px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="brand-logo">🩺</div>
+      <div class="brand-text">
+        <h1>KICS 2026</h1>
+        <p>Brain Meets Bedside</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="user-score-badge" class="score-badge">⭐️ <span id="header-score">0</span> pts</div>
+      <button id="btn-audio-toggle" class="icon-btn" title="Toggle Sound" aria-label="Toggle Sound">🔊</button>
+      <button id="btn-view-toggle" class="icon-btn" title="View Stage Leaderboard" aria-label="View Leaderboard">🏆</button>
+    </div>
+  </header>
+
+  <!-- Registration Modal -->
+  <div id="registration-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="font-size: 36px; margin-bottom: 8px;">🎯</div>
+        <h2>Delegate Registration</h2>
+        <p>Enter your details to join the live conference treasure hunt</p>
+      </div>
+      <form id="registration-form">
+        <div class="form-group">
+          <label for="reg-name">Full Name (with title)</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="Enter doctor's full name" value="" required autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="reg-hospital">Hospital / Medical College</label>
+          <input type="text" id="reg-hospital" class="form-input" placeholder="Enter hospital or institution" value="" required>
+        </div>
+        <div class="form-group">
+          <label for="reg-mobile">Mobile Number</label>
+          <input type="tel" id="reg-mobile" class="form-input" placeholder="Enter mobile number" value="" required>
+        </div>
+        <button type="submit" class="action-btn" id="btn-start-hunt">
+          <span>Enter Treasure Hunt</span> 🚀
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Digital Padlock Modal -->
+  <div id="passcode-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: center; max-width: 420px;">
+      <div class="modal-header">
+        <div style="font-size: 42px; margin-bottom: 8px;">🔒</div>
+        <h2 id="modal-passcode-title">Stage Locked</h2>
+        <p id="modal-passcode-subtitle">Enter the secret passcode announced during the break to unlock this stage.</p>
+      </div>
+      <div class="passcode-form" style="margin-top: 10px;">
+        <div class="passcode-input-wrapper">
+          <input type="text" id="modal-passcode-input" class="passcode-input" placeholder="ENTER PASSCODE" value="" maxlength="20" autocomplete="off" style="text-align: center; text-transform: uppercase; font-size: 1.15rem; letter-spacing: 2px;">
+          <div class="error-msg" id="modal-passcode-error"></div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button type="button" class="btn-ghost" id="btn-modal-close" style="flex: 1; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; cursor: pointer;">Cancel</button>
+          <button type="button" class="action-btn" id="btn-modal-unlock" style="flex: 1; margin: 0; padding: 12px;">Unlock Stage</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Delegate Interface -->
+  <main id="delegate-view" class="container">
+    <!-- QR Code / URL Auto-Unlock Notification -->
+    <div id="auto-unlock-pill"></div>
+
+    <!-- Stepper Navigation -->
+    <nav class="stepper-nav" aria-label="Treasure Hunt Stages">
+      <button class="step-node active" data-stage="1" id="step-nav-1">
+        <div class="step-circle">1</div>
+        <div class="step-label">Waterfall</div>
+      </button>
+      <button class="step-node locked" data-stage="2" id="step-nav-2">
+        <div class="step-circle">🔒</div>
+        <div class="step-label">Pittsburgh</div>
+      </button>
+      <button class="step-node locked" data-stage="3" id="step-nav-3">
+        <div class="step-circle">🔒</div>
+        <div class="step-label">Bengaluru</div>
+      </button>
+      <button class="step-node locked" data-stage="4" id="step-nav-4">
+        <div class="step-circle">🔒</div>
+        <div class="step-label">Puzzle</div>
+      </button>
+      <button class="step-node locked" data-stage="5" id="step-nav-5">
+        <div class="step-circle">🔒</div>
+        <div class="step-label">Pictionary</div>
+      </button>
+    </nav>
+
+    <!-- STAGE 1: JOG FALLS CASCADE (MCQ) -->
+    <section class="stage-card" id="stage-card-1">
+      <div class="stage-card-header">
+        <span class="stage-pill">Break 1 • Connect The Dots</span>
+        <span class="stage-pill" id="stage-1-status-pill">Max 1000 Pts</span>
+      </div>
+      <div class="stage-card-body">
+        <h2 class="stage-title">1. The Jog Falls Cascade</h2>
+        <p class="stage-question">Which critical care concept comes to mind when you see this spectacular cascade?</p>
+        
+        <div class="media-container">
+          <img src="assets/images/stage1_jogfalls.png" alt="Jog Falls waterfall cascade" id="stage1-img">
+          <div class="media-caption">Jog Falls, Western Ghats, Karnataka</div>
+        </div>
+
+        <div class="speed-score-bar">
+          <div class="speed-timer" id="stage1-timer">⏱️ Time Elapsed: <span>0s</span></div>
+          <div class="potential-pts" id="stage1-potential">Potential: 1000 pts</div>
+        </div>
+
+        <div class="attempt-notice">⚠️ Single-attempt policy: You get only ONE chance to submit your answer!</div>
+
+        <div id="stage1-interactive">
+          <div class="mcq-options-group" id="stage1-options">
+            <label class="mcq-label">
+              <input type="radio" name="stage1-opt" class="mcq-radio" value="opt-a">
+              <span class="option-letter">A</span>
+              <span>West's Zone 1 dead-space ventilation</span>
+            </label>
+            <label class="mcq-label">
+              <input type="radio" name="stage1-opt" class="mcq-radio" value="opt-b">
+              <span class="option-letter">B</span>
+              <span>Vascular waterfall effect (critical closing pressure)</span>
+            </label>
+            <label class="mcq-label">
+              <input type="radio" name="stage1-opt" class="mcq-radio" value="opt-c">
+              <span class="option-letter">C</span>
+              <span>Frank-Starling ventricular compliance curve</span>
+            </label>
+            <label class="mcq-label">
+              <input type="radio" name="stage1-opt" class="mcq-radio" value="opt-d">
+              <span class="option-letter">D</span>
+              <span>Hagen-Poiseuille laminar resistance</span>
+            </label>
+          </div>
+          <div class="error-msg" id="stage1-error"></div>
+          <button class="action-btn" id="btn-submit-stage1">Submit Answer</button>
+        </div>
+
+        <div id="stage1-result" style="display: none;">
+          <div id="stage1-feedback-banner" class="graded-banner"></div>
+          <div class="media-container" style="margin-top: 16px;">
+            <img src="assets/images/stage1_answer_waterfall.png" alt="Vascular waterfall physiology diagram">
+            <div class="media-caption">Physiological Waterfall: Pa &rarr; Pcrit &rarr; Pmsf</div>
+          </div>
+          <div class="graded-banner banner-correct" style="margin-top: 10px;">
+            <h4>Physiological Takeaway</h4>
+            <p><strong>The Vascular Waterfall Phenomenon:</strong> When downstream venous pressure falls below critical closing surrounding pressure ($P_{crit}$), flow becomes completely independent of downstream pressure and depends strictly on upstream driving pressure ($P_a - P_{crit}$).</p>
+          </div>
+          <button class="action-btn" id="btn-next-stage-2" style="margin-top: 16px;">
+            <span>Proceed to Break 2 (Stage 2)</span> ➡️
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 2: PITTSBURGH & ROSE TRIAL (MCQ) -->
+    <section class="stage-card" id="stage-card-2" style="display: none;">
+      <div class="stage-card-header">
+        <span class="stage-pill">Break 2 • Name The Landmark</span>
+        <span class="stage-pill status-locked" id="stage-2-status-pill">Locked</span>
+      </div>
+      <div class="stage-card-body">
+        <!-- Locked View -->
+        <div id="stage2-locked" class="locked-view">
+          <div class="lock-icon-wrapper">🔒</div>
+          <h3 class="lock-title">Stage 2 is Locked</h3>
+          <p class="lock-subtitle">Obtain the secret passcode announced from the auditorium stage during Break 2 or scan the Break 2 QR code.</p>
+          <div class="passcode-form">
+            <div class="passcode-input-wrapper">
+              <input type="text" id="passcode-2" class="passcode-input" placeholder="ENTER PASSCODE" value="" maxlength="20" autocomplete="off">
+              <div class="error-msg" id="passcode-2-error"></div>
+            </div>
+            <button class="action-btn" id="btn-unlock-stage-2">Unlock Stage 2</button>
+          </div>
+        </div>
+
+        <!-- Unlocked View -->
+        <div id="stage2-content" style="display: none;">
+          <h2 class="stage-title">2. Global Critical Care Landmark</h2>
+          <p class="stage-question">Identify the institution and the famous ARDS trial associated with its researchers:</p>
+          
+          <div class="media-container">
+            <img src="assets/images/stage2_pittsburgh.png" alt="University of Pittsburgh medical school facade with name redacted">
+            <div class="media-caption">Exterior stone facade • Landmark institution</div>
+          </div>
+
+          <div class="speed-score-bar">
+            <div class="speed-timer" id="stage2-timer">⏱️ Time Elapsed: <span>0s</span></div>
+            <div class="potential-pts" id="stage2-potential">Potential: 1000 pts</div>
+          </div>
+
+          <div class="attempt-notice">⚠️ Single-attempt policy: You get only ONE chance to submit your answer!</div>
+
+          <div id="stage2-interactive">
+            <div class="mcq-options-group" id="stage2-options">
+              <label class="mcq-label">
+                <input type="radio" name="stage2-opt" class="mcq-radio" value="opt-a">
+                <span class="option-letter">A</span>
+                <span>University of Washington — PROSEVA Trial</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage2-opt" class="mcq-radio" value="opt-b">
+                <span class="option-letter">B</span>
+                <span>Johns Hopkins University — ARMA Trial</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage2-opt" class="mcq-radio" value="opt-c">
+                <span class="option-letter">C</span>
+                <span>University of Pittsburgh — ROSE Trial</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage2-opt" class="mcq-radio" value="opt-d">
+                <span class="option-letter">D</span>
+                <span>Harvard Medical School — OSCAR Trial</span>
+              </label>
+            </div>
+            <div class="error-msg" id="stage2-error"></div>
+            <button class="action-btn" id="btn-submit-stage2">Submit Answer</button>
+          </div>
+
+          <div id="stage2-result" style="display: none;">
+            <div id="stage2-feedback-banner" class="graded-banner"></div>
+            <div class="media-container" style="margin-top: 16px;">
+              <img src="assets/images/stage2_answer_cathedral.png" alt="Cathedral of Learning and ROSE trial citation">
+              <div class="media-caption">Cathedral of Learning & ROSE Trial (Huang et al. NEJM 2019)</div>
+            </div>
+            <div class="graded-banner banner-correct" style="margin-top: 10px;">
+              <h4>Clinical Takeaway</h4>
+              <p><strong>University of Pittsburgh & ROSE Trial:</strong> The PETAL Network ROSE trial compared routine early continuous neuromuscular blockade (cisatracurium) plus deep sedation against lighter sedation targets in moderate-to-severe ARDS. Routine early continuous paralysis did not improve 90-day mortality.</p>
+            </div>
+            <button class="action-btn" id="btn-next-stage-3" style="margin-top: 16px;">
+              <span>Proceed to Break 3 (Stage 3)</span> ➡️
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 3: BENGALURU 10-SPOT GRID (MCQ) -->
+    <section class="stage-card" id="stage-card-3" style="display: none;">
+      <div class="stage-card-header">
+        <span class="stage-pill">Break 3 • Bengaluru Heritage</span>
+        <span class="stage-pill status-locked" id="stage-3-status-pill">Locked</span>
+      </div>
+      <div class="stage-card-body">
+        <!-- Locked View -->
+        <div id="stage3-locked" class="locked-view">
+          <div class="lock-icon-wrapper">🔒</div>
+          <h3 class="lock-title">Stage 3 is Locked</h3>
+          <p class="lock-subtitle">Enter the secret passcode revealed during Break 3 in the auditorium or scan the Break 3 QR code.</p>
+          <div class="passcode-form">
+            <div class="passcode-input-wrapper">
+              <input type="text" id="passcode-3" class="passcode-input" placeholder="ENTER PASSCODE" value="" maxlength="20" autocomplete="off">
+              <div class="error-msg" id="passcode-3-error"></div>
+            </div>
+            <button class="action-btn" id="btn-unlock-stage-3">Unlock Stage 3</button>
+          </div>
+        </div>
+
+        <!-- Unlocked View -->
+        <div id="stage3-content" style="display: none;">
+          <h2 class="stage-title">3. Guess the Spot • Bengaluru Edition</h2>
+          <p class="stage-question">Spot the Bengaluru Heritage! Look closely at the collage: identify the majestic royal residence at <strong>Spot 5</strong> and the historic bustling bazaar at <strong>Spot 10</strong>:</p>
+          
+          <div class="media-container">
+            <img src="assets/images/stage3_bengaluru_grid.png" alt="10-spot Bengaluru landmark collage">
+            <div class="media-caption">10-Spot Bengaluru Landmark Collage (Examine Spots 5 and 10)</div>
+          </div>
+
+          <div class="speed-score-bar">
+            <div class="speed-timer" id="stage3-timer">⏱️ Time Elapsed: <span>0s</span></div>
+            <div class="potential-pts" id="stage3-potential">Potential: 1000 pts</div>
+          </div>
+
+          <div class="attempt-notice">⚠️ Single-attempt policy: You get only ONE chance to submit your answer!</div>
+
+          <div id="stage3-interactive">
+            <div class="mcq-options-group" id="stage3-options">
+              <label class="mcq-label">
+                <input type="radio" name="stage3-opt" class="mcq-radio" value="opt-a">
+                <span class="option-letter">A</span>
+                <span>Spot 5: Tipu Sultan’s Summer Palace | Spot 10: Russell Market</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage3-opt" class="mcq-radio" value="opt-b">
+                <span class="option-letter">B</span>
+                <span>Spot 5: Bangalore Palace | Spot 10: KR Market</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage3-opt" class="mcq-radio" value="opt-c">
+                <span class="option-letter">C</span>
+                <span>Spot 5: Bangalore Fort | Spot 10: Gandhi Bazaar</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage3-opt" class="mcq-radio" value="opt-d">
+                <span class="option-letter">D</span>
+                <span>Spot 5: Mayo Hall | Spot 10: Malleshwaram 8th Cross Market</span>
+              </label>
+            </div>
+            <div class="error-msg" id="stage3-error"></div>
+            <button class="action-btn" id="btn-submit-stage3">Submit Answer</button>
+          </div>
+
+          <div id="stage3-result" style="display: none;">
+            <div id="stage3-feedback-banner" class="graded-banner"></div>
+            <div class="graded-banner banner-correct" style="margin-top: 10px;">
+              <h4>Heritage Breakdown</h4>
+              <p><strong>Bangalore Palace & KR Market:</strong> Spot 5 is Bangalore Palace, built in 1878 by the Royal Wodeyar Dynasty in Tudor-Revival style. Spot 10 is Krishna Rajendra (KR) Market established in 1928, famous for its world-renowned dawn flower auctions.</p>
+            </div>
+            <button class="action-btn" id="btn-next-stage-4" style="margin-top: 16px;">
+              <span>Proceed to Break 4 (Stage 4)</span> ➡️
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 4: PICTURE PUZZLE (MCQ) -->
+    <section class="stage-card" id="stage-card-4" style="display: none;">
+      <div class="stage-card-header">
+        <span class="stage-pill">Break 4 • Picture Puzzle</span>
+        <span class="stage-pill status-locked" id="stage-4-status-pill">Locked</span>
+      </div>
+      <div class="stage-card-body">
+        <!-- Locked View -->
+        <div id="stage4-locked" class="locked-view">
+          <div class="lock-icon-wrapper">🔒</div>
+          <h3 class="lock-title">Stage 4 is Locked</h3>
+          <p class="lock-subtitle">Enter the secret passcode revealed during Break 4 in the auditorium or scan the Break 4 QR code.</p>
+          <div class="passcode-form">
+            <div class="passcode-input-wrapper">
+              <input type="text" id="passcode-4" class="passcode-input" placeholder="ENTER PASSCODE" value="" maxlength="20" autocomplete="off">
+              <div class="error-msg" id="passcode-4-error"></div>
+            </div>
+            <button class="action-btn" id="btn-unlock-stage-4">Unlock Stage 4</button>
+          </div>
+        </div>
+
+        <!-- Unlocked View -->
+        <div id="stage4-content" style="display: none;">
+          <h2 class="stage-title">4. Connect the Clinical Dots</h2>
+          <p class="stage-question">What is the link between these images? <em>(A place... A problem... A plan!)</em></p>
+          
+          <div class="media-container">
+            <img src="assets/images/stage4_puzzle.png" alt="3-panel picture puzzle: mountains, CXR, NIV mask">
+            <div class="media-caption">High altitude &rarr; Bilateral infiltrates &rarr; Pressure support</div>
+          </div>
+
+          <div class="speed-score-bar">
+            <div class="speed-timer" id="stage4-timer">⏱️ Time Elapsed: <span>0s</span></div>
+            <div class="potential-pts" id="stage4-potential">Potential: 1000 pts</div>
+          </div>
+
+          <div class="attempt-notice">⚠️ Single-attempt policy: You get only ONE chance to submit your answer!</div>
+
+          <div id="stage4-interactive">
+            <div class="mcq-options-group" id="stage4-options">
+              <label class="mcq-label">
+                <input type="radio" name="stage4-opt" class="mcq-radio" value="opt-a">
+                <span class="option-letter">A</span>
+                <span>High Altitude Cerebral Edema (HACE) & Dexamethasone</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage4-opt" class="mcq-radio" value="opt-b">
+                <span class="option-letter">B</span>
+                <span>High-Altitude Pulmonary Edema (HAPE) & Non-Invasive Ventilation (NIV)</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage4-opt" class="mcq-radio" value="opt-c">
+                <span class="option-letter">C</span>
+                <span>Decompression Sickness & Hyperbaric Oxygen</span>
+              </label>
+              <label class="mcq-label">
+                <input type="radio" name="stage4-opt" class="mcq-radio" value="opt-d">
+                <span class="option-letter">D</span>
+                <span>Flash Pulmonary Edema & Emergent Hemodialysis</span>
+              </label>
+            </div>
+            <div class="error-msg" id="stage4-error"></div>
+            <button class="action-btn" id="btn-submit-stage4">Submit Answer</button>
+          </div>
+
+          <div id="stage4-result" style="display: none;">
+            <div id="stage4-feedback-banner" class="graded-banner"></div>
+            <div class="media-container" style="margin-top: 16px;">
+              <img src="assets/images/stage4_answer.png" alt="HAPE answer and clinical takeaways">
+              <div class="media-caption">HAPE Pathology & Management: Immediate descent & Oxygenation</div>
+            </div>
+            <div class="graded-banner banner-correct" style="margin-top: 10px;">
+              <h4>Pathophysiology & Management</h4>
+              <p><strong>High Altitude Pulmonary Edema (HAPE):</strong> Exaggerated hypoxic pulmonary vasoconstriction leads to uneven capillary hydrostatic stress failure and high-permeability non-cardiogenic edema. Definitive management: immediate descent (&gt;1000m), supplemental $O_2$, hyperbaric bag (Gamow bag), and nifedipine / phosphodiesterase-5 inhibitors.</p>
+            </div>
+            <button class="action-btn" id="btn-next-stage-5" style="margin-top: 16px;">
+              <span>Proceed to Break 5 (Final Stage)</span> ➡️
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 5: PICTIONARY REBUS (THE ONLY TEXT INPUT STAGE) -->
+    <section class="stage-card" id="stage-card-5" style="display: none;">
+      <div class="stage-card-header">
+        <span class="stage-pill">Break 5 • Pictionary Rebus</span>
+        <span class="stage-pill status-locked" id="stage-5-status-pill">Locked</span>
+      </div>
+      <div class="stage-card-body">
+        <!-- Locked View -->
+        <div id="stage5-locked" class="locked-view">
+          <div class="lock-icon-wrapper">🔒</div>
+          <h3 class="lock-title">Stage 5 is Locked</h3>
+          <p class="lock-subtitle">Enter the final secret passcode announced during Break 5 or scan the Break 5 QR code.</p>
+          <div class="passcode-form">
+            <div class="passcode-input-wrapper">
+              <input type="text" id="passcode-5" class="passcode-input" placeholder="ENTER PASSCODE" value="" maxlength="20" autocomplete="off">
+              <div class="error-msg" id="passcode-5-error"></div>
+            </div>
+            <button class="action-btn" id="btn-unlock-stage-5">Unlock Stage 5</button>
+          </div>
+        </div>
+
+        <!-- Unlocked View -->
+        <div id="stage5-content" style="display: none;">
+          <h2 class="stage-title">5. Solve the Medical Pictionary!</h2>
+          <p class="stage-question">Guess the Pictionary! <em>(Hint: It is the name of a disease)</em></p>
+          
+          <div class="media-container">
+            <img src="assets/images/stage5_pictionary.png" alt="Pictionary Rebus: Charcoal + Mohammad Azharuddin">
+            <div class="media-caption">Rebus Equation: Picture 1 (Charcoal) + Picture 2 (Cricketer)</div>
+          </div>
+
+          <div class="speed-score-bar">
+            <div class="speed-timer" id="stage5-timer">⏱️ Time Elapsed: <span>0s</span></div>
+            <div class="potential-pts" id="stage5-potential">Potential: 1000 pts</div>
+          </div>
+
+          <div class="attempt-notice">⚠️ Single-attempt policy: You get only ONE chance to submit your answer!</div>
+
+          <div id="stage5-interactive">
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="stage5-answer" style="color: var(--accent-cyan);">Type Disease Name:</label>
+              <input type="text" id="stage5-answer" class="form-input" placeholder="Type disease name here..." value="" autocomplete="off">
+            </div>
+            <div class="error-msg" id="stage5-error"></div>
+            <button class="action-btn" id="btn-submit-stage5">Submit Answer</button>
+          </div>
+
+          <!-- Result Container (Dynamically Populated After Submission to Prevent DOM Spoilers) -->
+          <div id="stage5-result" style="display: none; margin-top: 18px;">
+            <div id="stage5-feedback-banner" class="graded-banner"></div>
+            <div id="stage5-clinical-card" style="margin-top: 10px;"></div>
+
+            <div style="margin-top: 24px; text-align: center;">
+              <div style="font-size: 32px; margin-bottom: 8px;">🏆</div>
+              <h3 style="font-size: 20px; font-weight: 800; color: #fff;">Treasure Hunt Completed!</h3>
+              <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">Your final score has been transmitted to the Auditorium Projector Screen.</p>
+              <button class="action-btn" id="btn-view-stage-board" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                <span>View Stage Leaderboard</span> 🏆
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Auditorium Projector View (#leaderboard) -->
+  <section id="leaderboard-view">
+    <div class="stage-header">
+      <div class="stage-subtitle">Karnataka Intensive Care Conference • KICS 2026</div>
+      <h1 class="stage-title-text">Live Stage Leaderboard</h1>
+      <button id="btn-back-to-hunt" class="hud-btn" style="position: absolute; left: 0; top: 8px;">
+        <span>← Mobile View</span>
+      </button>
+    </div>
+
+    <!-- Presenter HUD -->
+    <div class="presenter-hud">
+      <div class="hud-stats">
+        <div class="hud-stat-item">
+          <span class="hud-stat-label">Active Delegates</span>
+          <span class="hud-stat-value" id="hud-total-delegates">100</span>
+        </div>
+        <div class="hud-stat-item">
+          <span class="hud-stat-label">Top Score</span>
+          <span class="hud-stat-value" id="hud-max-score" style="color: #fbbf24;">5000 Pts</span>
+        </div>
+        <div class="hud-stat-item">
+          <span class="hud-stat-label">Completion Rate</span>
+          <span class="hud-stat-value" id="hud-completion-rate" style="color: var(--accent-emerald);">94%</span>
+        </div>
+      </div>
+      <div class="hud-controls">
+        <button id="btn-freeze-toggle" class="hud-btn" title="Press 'F' key to freeze/unfreeze">
+          <span id="freeze-icon">⏸️</span>
+          <span id="freeze-text">Freeze Board (F)</span>
+        </button>
+        <button id="btn-confetti" class="hud-btn" title="Press 'C' key to trigger celebration">
+          <span>🎊</span>
+          <span>Confetti (C)</span>
+        </button>
+        <button id="btn-export-csv" class="hud-btn" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5);">
+          <span>📥</span>
+          <span>Export CSV</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Top 3 Podium -->
+    <div class="podium-container" id="podium-display">
+      <!-- 2nd Place -->
+      <div class="podium-card rank-2" id="podium-card-2">
+        <div class="trophy-badge">🥈</div>
+        <div class="podium-name" id="podium-name-2">Loading...</div>
+        <div class="podium-hospital" id="podium-hospital-2">Hospital</div>
+        <div class="podium-score"><span id="podium-score-2">0</span> <small style="font-size: 14px;">pts</small></div>
+        <div class="podium-stages" id="podium-stages-2">5/5 Stages Done</div>
+      </div>
+      <!-- 1st Place (Gold) -->
+      <div class="podium-card rank-1" id="podium-card-1">
+        <div class="trophy-badge">🥇</div>
+        <div class="podium-name" id="podium-name-1">Loading...</div>
+        <div class="podium-hospital" id="podium-hospital-1">Hospital</div>
+        <div class="podium-score"><span id="podium-score-1">0</span> <small style="font-size: 14px;">pts</small></div>
+        <div class="podium-stages" id="podium-stages-1">5/5 Stages Done</div>
+      </div>
+      <!-- 3rd Place -->
+      <div class="podium-card rank-3" id="podium-card-3">
+        <div class="trophy-badge">🥉</div>
+        <div class="podium-name" id="podium-name-3">Loading...</div>
+        <div class="podium-hospital" id="podium-hospital-3">Hospital</div>
+        <div class="podium-score"><span id="podium-score-3">0</span> <small style="font-size: 14px;">pts</small></div>
+        <div class="podium-stages" id="podium-stages-3">5/5 Stages Done</div>
+      </div>
+    </div>
+
+    <!-- Live Auto-scrolling Ticker (Participants 4 to 100) -->
+    <div class="ticker-wrapper">
+      <div class="ticker-header">
+        <span>Rank</span>
+        <span>Doctor Name</span>
+        <span class="ticker-hospital">Institution</span>
+        <span>Stages</span>
+        <span style="text-align: right;">Points</span>
+      </div>
+      <div class="ticker-viewport" id="ticker-viewport">
+        <!-- Rows injected dynamically via JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Application Logic -->
+  <script>
+    /**
+     * KICS 2026 Progressive Web App Controller
+     * Time-Decayed Scoring: Points = max(200, 1000 - (seconds * 10))
+     * Strict Single-Attempt Policy (1000 Pts max / 0 Pts penalty)
+     * Stages 1-4: MCQs (Radio Inputs, None Pre-Selected)
+     * Stage 5: Single Blank Text Input (Zero DOM Spoilers)
+     */
+    const CONFIG = {
+      WEBHOOK_URL: "",
+      PASSCODES: {
+        2: "LALBAGH1760",
+        3: "VIDHANA1956",
+        4: "CUBBON1870",
+        5: "CTR1920"
+      }
+    };
+
+    let AppState = {
+      user: null,
+      currentStage: 1,
+      unlockedStages: [1],
+      score: 0,
+      stageStartTimes: {},   // { 1: timestamp, 2: timestamp, ... }
+      stageSubmissions: {},  // { 1: { submitted: true, score: 980, timeTaken: 2, answer: "...", correct: true } }
+      soundMuted: false,
+      isFrozen: false,
+      scrollInterval: null,
+      scrollPos: 0,
+      targetLockedStage: 2
+    };
+
+    const syncChannel = new BroadcastChannel("kics_sync");
+
+    /* ========================================================
+       1. WEB AUDIO API SYNTHESIZER
+       ======================================================== */
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    const SoundFX = {
+      successChord() {
+        if (AppState.soundMuted) return;
+        try {
+          const ctx = getAudioContext();
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
+            gain.gain.setValueAtTime(0, ctx.currentTime + idx * 0.08);
+            gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + idx * 0.08 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.08 + 0.5);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.08);
+            osc.stop(ctx.currentTime + idx * 0.08 + 0.55);
+          });
+        } catch (e) {
+          console.warn("Audio error:", e);
+        }
+      },
+      padlockClick() {
+        if (AppState.soundMuted) return;
+        try {
+          const ctx = getAudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(800, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.06);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.07);
+        } catch (e) {
+          console.warn("Audio error:", e);
+        }
+      },
+      errorBuzz() {
+        if (AppState.soundMuted) return;
+        try {
+          const ctx = getAudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(130, ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(90, ctx.currentTime + 0.25);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.26);
+        } catch (e) {
+          console.warn("Audio error:", e);
+        }
+      }
+    };
+
+    /* ========================================================
+       2. TEXT INPUT ISOLATION (NO KEYSTROKE HIJACKING)
+       ======================================================== */
+    function isolateInputs() {
+      const inputs = document.querySelectorAll('input, textarea, select');
+      inputs.forEach(input => {
+        ['keydown', 'keyup', 'keypress', 'input'].forEach(evtType => {
+          input.addEventListener(evtType, (e) => {
+            e.stopPropagation();
+          });
+        });
+      });
+    }
+
+    /* ========================================================
+       3. STORAGE & TIME-DECAYED SCORING ENGINE
+       ======================================================== */
+    function calculateTimePoints(elapsedSeconds) {
+      // Points = max(200, 1000 - (seconds * 10))
+      return Math.max(200, 1000 - (elapsedSeconds * 10));
+    }
+
+    function ensureStageTimer(stageNum) {
+      if (!AppState.stageStartTimes[stageNum]) {
+        AppState.stageStartTimes[stageNum] = Date.now();
+        saveState();
+      }
+    }
+
+    function loadSavedState() {
+      try {
+        const storedUser = localStorage.getItem("kics_user");
+        if (storedUser) {
+          AppState.user = JSON.parse(storedUser);
+        }
+        const storedHunt = localStorage.getItem("kics_hunt_state");
+        if (storedHunt) {
+          const parsed = JSON.parse(storedHunt);
+          AppState.unlockedStages = parsed.unlockedStages || [1];
+          AppState.currentStage = parsed.currentStage || 1;
+          AppState.stageStartTimes = parsed.stageStartTimes || {};
+          AppState.stageSubmissions = parsed.stageSubmissions || {};
+
+          let totalScore = 0;
+          for (const s in AppState.stageSubmissions) {
+            totalScore += (AppState.stageSubmissions[s].score || 0);
+          }
+          AppState.score = totalScore;
+        }
+      } catch (e) {
+        console.error("Storage load error:", e);
+      }
+    }
+
+    function saveState() {
+      try {
+        if (AppState.user) {
+          localStorage.setItem("kics_user", JSON.stringify(AppState.user));
+        }
+        localStorage.setItem("kics_hunt_state", JSON.stringify({
+          unlockedStages: AppState.unlockedStages,
+          currentStage: AppState.currentStage,
+          score: AppState.score,
+          stageStartTimes: AppState.stageStartTimes,
+          stageSubmissions: AppState.stageSubmissions
+        }));
+
+        const submittedCount = Object.keys(AppState.stageSubmissions).length;
+        let totalElapsed = 0;
+        for (const s in AppState.stageSubmissions) {
+          totalElapsed += (AppState.stageSubmissions[s].timeTaken || 0);
+        }
+
+        syncChannel.postMessage({
+          type: "USER_UPDATE",
+          user: AppState.user,
+          score: AppState.score,
+          stagesCompleted: submittedCount,
+          totalTimeTaken: totalElapsed,
+          timestamp: new Date().toISOString()
+        });
+
+        if (CONFIG.WEBHOOK_URL && AppState.user) {
+          fetch(CONFIG.WEBHOOK_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user: AppState.user,
+              score: AppState.score,
+              stages: submittedCount,
+              totalTimeTaken: totalElapsed,
+              timestamp: new Date().toISOString()
+            })
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.error("Storage save error:", e);
+      }
+    }
+
+    /* ========================================================
+       4. URL PARAMETER AUTO-UNLOCK (QR CODE SUPPORT)
+       ======================================================== */
+    function checkUrlAutoUnlock() {
+      const params = new URLSearchParams(window.location.search);
+      const unlockCode = (params.get('unlock') || "").trim().toUpperCase();
+      if (!unlockCode) return;
+
+      for (const [stageStr, expectedCode] of Object.entries(CONFIG.PASSCODES)) {
+        if (unlockCode === expectedCode) {
+          const s = parseInt(stageStr);
+          if (!AppState.unlockedStages.includes(s)) {
+            AppState.unlockedStages.push(s);
+          }
+          AppState.currentStage = s;
+          ensureStageTimer(s);
+          saveState();
+          SoundFX.padlockClick();
+
+          const pill = document.getElementById('auto-unlock-pill');
+          if (pill) {
+            pill.textContent = `🔓 QR Code Verified! Stage ${s} unlocked!`;
+            pill.style.display = 'block';
+            setTimeout(() => { pill.style.display = 'none'; }, 5000);
+          }
+          break;
+        }
+      }
+    }
+
+    /* ========================================================
+       5. PRODUCTION LEADERBOARD ROSTER (ZERO MOCK DATA)
+       ======================================================== */
+    let participants = []; // Production array initialized strictly empty
+    window.participants = participants;
+
+    /* ========================================================
+       6. DIGITAL PADLOCK MODAL & PASSCODE GATE CONTROLLERS
+       ======================================================== */
+    function openPasscodeModal(stageNum) {
+      AppState.targetLockedStage = stageNum;
+      const titles = {
+        2: "Unlock Stage 2 (Break 2)",
+        3: "Unlock Stage 3 (Break 3)",
+        4: "Unlock Stage 4 (Break 4)",
+        5: "Unlock Stage 5 (Break 5)"
+      };
+      const subtitles = {
+        2: "Announced during Break 2: Global Critical Care Landmark",
+        3: "Announced during Break 3: Bengaluru Heritage Grid",
+        4: "Announced during Break 4: Critical Care Picture Puzzle",
+        5: "Announced during Break 5: Clinical Pictionary Rebus"
+      };
+      const titleEl = document.getElementById('modal-passcode-title');
+      const subtitleEl = document.getElementById('modal-passcode-subtitle');
+      if (titleEl) titleEl.textContent = titles[stageNum] || `Unlock Stage ${stageNum}`;
+      if (subtitleEl) subtitleEl.textContent = subtitles[stageNum] || "Enter secret passcode:";
+      
+      const input = document.getElementById('modal-passcode-input');
+      if (input) {
+        input.value = "";
+        input.classList.remove('error');
+      }
+      const errBox = document.getElementById('modal-passcode-error');
+      if (errBox) errBox.textContent = "";
+
+      const modal = document.getElementById('passcode-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        setTimeout(() => { if (input) input.focus(); }, 60);
+      }
+    }
+
+    function closePasscodeModal() {
+      const modal = document.getElementById('passcode-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function handleModalUnlock() {
+      const stageNum = AppState.targetLockedStage || 2;
+      const input = document.getElementById('modal-passcode-input');
+      const errBox = document.getElementById('modal-passcode-error');
+      const entered = (input.value || "").trim().toUpperCase();
+      const expected = CONFIG.PASSCODES[stageNum];
+
+      if (entered === expected) {
+        SoundFX.padlockClick();
+        if (errBox) errBox.textContent = "";
+        if (input) input.classList.remove('error');
+        if (!AppState.unlockedStages.includes(stageNum)) {
+          AppState.unlockedStages.push(stageNum);
+        }
+        AppState.currentStage = stageNum;
+        ensureStageTimer(stageNum);
+        saveState();
+        closePasscodeModal();
+        updateUI();
+      } else {
+        SoundFX.errorBuzz();
+        if (input) input.classList.add('error');
+        if (errBox) errBox.textContent = "Invalid passcode. Please check announcement during Break.";
+        setTimeout(() => { if (input) input.classList.remove('error'); }, 500);
+      }
+    }
+
+    /* ========================================================
+       7. LEADERBOARD RENDERING & TICKER AUTO-SCROLL
+       ======================================================== */
+    function getCombinedLeaderboard() {
+      let list = [...(window.participants || participants || [])];
+
+      if (AppState.user && Object.keys(AppState.stageSubmissions).length > 0) {
+        const totalTime = Object.values(AppState.stageSubmissions).reduce((acc, cur) => acc + (cur.timeTaken || 0), 0);
+        const userRecord = {
+          id: AppState.user.mobile || 'current-user',
+          name: AppState.user.name,
+          hospital: AppState.user.hospital,
+          mobile: AppState.user.mobile,
+          stagesCompleted: Object.keys(AppState.stageSubmissions).length,
+          score: AppState.score,
+          totalTimeTaken: totalTime,
+          timestamp: AppState.user.timestamp || new Date().toISOString(),
+          isCurrentUser: true
+        };
+
+        const uIdx = list.findIndex(p => p.isCurrentUser || (p.mobile && p.mobile === userRecord.mobile));
+        if (uIdx >= 0) {
+          list[uIdx] = userRecord;
+        } else {
+          list.push(userRecord);
+        }
+      }
+
+      // Sort primarily by Score (Descending), secondarily by Total Time (Ascending)
+      list.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (a.totalTimeTaken || 0) - (b.totalTimeTaken || 0);
+      });
+
+      return list;
+    }
+
+    function renderLeaderboardView() {
+      const records = getCombinedLeaderboard();
+      const total = records.length;
+      const totalEl = document.getElementById('hud-total-delegates');
+      if (totalEl) totalEl.textContent = total;
+
+      const topScore = records.length > 0 ? `${records[0].score} Pts` : "0 Pts";
+      const hudMaxScore = document.getElementById('hud-max-score');
+      if (hudMaxScore) hudMaxScore.textContent = topScore;
+
+      const completedAll = records.filter(r => r.stagesCompleted === 5).length;
+      const compRate = total > 0 ? Math.round((completedAll / total) * 100) : 0;
+      const hudCompRate = document.getElementById('hud-completion-rate');
+      if (hudCompRate) hudCompRate.textContent = `${compRate}%`;
+
+      // Top 3 Podium
+      const podiumConfigs = [
+        { rank: 1, nameId: 'podium-name-1', hospId: 'podium-hospital-1', scoreId: 'podium-score-1', stgId: 'podium-stages-1' },
+        { rank: 2, nameId: 'podium-name-2', hospId: 'podium-hospital-2', scoreId: 'podium-score-2', stgId: 'podium-stages-2' },
+        { rank: 3, nameId: 'podium-name-3', hospId: 'podium-hospital-3', scoreId: 'podium-score-3', stgId: 'podium-stages-3' }
+      ];
+
+      podiumConfigs.forEach((cfg, idx) => {
+        const item = records[idx];
+        if (item) {
+          document.getElementById(cfg.nameId).textContent = item.name;
+          document.getElementById(cfg.hospId).textContent = item.hospital;
+          document.getElementById(cfg.scoreId).textContent = item.score;
+          document.getElementById(cfg.stgId).textContent = `${item.stagesCompleted}/5 Stages Done`;
+        } else {
+          document.getElementById(cfg.nameId).textContent = "Awaiting Submissions...";
+          document.getElementById(cfg.hospId).textContent = "Conference Floor";
+          document.getElementById(cfg.scoreId).textContent = "0";
+          document.getElementById(cfg.stgId).textContent = "0/5 Stages Done";
+        }
+      });
+
+      // Ticker / Roster Table: ALL records
+      const viewport = document.getElementById('ticker-viewport');
+      if (!viewport) return;
+
+      if (records.length === 0) {
+        viewport.innerHTML = '<div class="empty-roster" id="empty-roster" style="text-align: center; padding: 48px 16px; color: #94a3b8; font-size: 1.05rem;">No participants have submitted yet. Complete Stage 1 to appear on the live leaderboard!</div>';
+      } else {
+        let rowsHtml = '';
+        for (let i = 0; i < records.length; i++) {
+          const item = records[i];
+          const isUserClass = item.isCurrentUser ? 'style="background: rgba(14, 165, 233, 0.15); border-left: 3px solid #0ea5e9;"' : '';
+          rowsHtml += `
+            <div class="ticker-row leaderboard-row" ${isUserClass} data-rank="${i + 1}">
+              <span class="ticker-rank">#${i + 1}</span>
+              <span class="ticker-name">${escapeHtml(item.name)} ${item.isCurrentUser ? '⭐' : ''}</span>
+              <span class="ticker-hospital">${escapeHtml(item.hospital)}</span>
+              <span class="ticker-stages">${item.stagesCompleted}/5 🔓</span>
+              <span class="ticker-score">${item.score} pts</span>
+            </div>
+          `;
+        }
+        viewport.innerHTML = rowsHtml;
+      }
+    }
+
+    window.renderLeaderboard = renderLeaderboardView;
+    window.renderLeaderboardView = renderLeaderboardView;
+
+    function startAutoScroll() {
+      if (AppState.scrollInterval) clearInterval(AppState.scrollInterval);
+      const viewport = document.getElementById('ticker-viewport');
+      
+      AppState.scrollInterval = setInterval(() => {
+        if (AppState.isFrozen || !viewport) return;
+        
+        viewport.scrollTop += 1;
+        if (viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 2) {
+          setTimeout(() => {
+            if (!AppState.isFrozen && viewport) viewport.scrollTop = 0;
+          }, 800);
+        }
+      }, 40);
+    }
+
+    function toggleFreeze() {
+      AppState.isFrozen = !AppState.isFrozen;
+      const btn = document.getElementById('btn-freeze-toggle');
+      const text = document.getElementById('freeze-text');
+      const icon = document.getElementById('freeze-icon');
+      
+      if (AppState.isFrozen) {
+        btn.classList.add('active-freeze');
+        text.textContent = "Leaderboard FROZEN";
+        icon.textContent = "❄️";
+      } else {
+        btn.classList.remove('active-freeze');
+        text.textContent = "Freeze Board (F)";
+        icon.textContent = "⏸️";
+      }
+    }
+
+    function launchConfetti() {
+      SoundFX.successChord();
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#0ea5e9', '#f59e0b', '#10b981', '#f43f5e', '#a855f7', '#fbbf24'];
+
+      for (let i = 0; i < 140; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height * 0.4,
+          vx: (Math.random() - 0.5) * 18,
+          vy: (Math.random() - 0.7) * 18,
+          size: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          vrot: (Math.random() - 0.5) * 10,
+          opacity: 1
+        });
+      }
+
+      function renderFrame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let active = false;
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.35;
+          p.rotation += p.vrot;
+          p.opacity -= 0.009;
+
+          if (p.opacity > 0) {
+            active = true;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate((p.rotation * Math.PI) / 180);
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = Math.max(0, p.opacity);
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+            ctx.restore();
+          }
+        });
+
+        if (active) {
+          requestAnimationFrame(renderFrame);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      requestAnimationFrame(renderFrame);
+    }
+
+    function exportCSV() {
+      const records = getCombinedLeaderboard();
+      let csv = "Rank,Doctor Name,Hospital/Institution,Mobile,Stages Completed,Score,TimeTakenSeconds,Timestamp\n";
+      records.forEach((r, idx) => {
+        csv += `${idx + 1},"${r.name}","${r.hospital}","${r.mobile}",${r.stagesCompleted},${r.score},${r.totalTimeTaken || 0},"${r.timestamp}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `kics2026_leaderboard_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    /* ========================================================
+       7. STAGE GATING & SINGLE-ATTEMPT EVALUATION
+       ======================================================== */
+    function updateUI() {
+      document.getElementById('header-score').textContent = AppState.score;
+
+      for (let s = 1; s <= 5; s++) {
+        const stepBtn = document.getElementById(`step-nav-${s}`);
+        const circle = stepBtn.querySelector('.step-circle');
+        
+        stepBtn.classList.remove('active', 'completed-correct', 'completed-incorrect', 'locked');
+        
+        const sub = AppState.stageSubmissions[s];
+        if (sub && sub.submitted) {
+          if (sub.score > 0) {
+            stepBtn.classList.add('completed-correct');
+            circle.textContent = '✓';
+          } else {
+            stepBtn.classList.add('completed-incorrect');
+            circle.textContent = '✕';
+          }
+        } else if (AppState.unlockedStages.includes(s)) {
+          if (s === AppState.currentStage) stepBtn.classList.add('active');
+          circle.textContent = s;
+        } else {
+          stepBtn.classList.add('locked');
+          if (s === AppState.currentStage) stepBtn.classList.add('active');
+          circle.textContent = '🔒';
+        }
+      }
+
+      for (let s = 1; s <= 5; s++) {
+        const card = document.getElementById('stage-card-' + s);
+        if (card) {
+          card.style.display = (s === AppState.currentStage) ? 'block' : 'none';
+        }
+
+        if (s > 1) {
+          const lockedDiv = document.getElementById(`stage${s}-locked`);
+          const contentDiv = document.getElementById(`stage${s}-content`);
+          const statusPill = document.getElementById(`stage-${s}-status-pill`);
+
+          if (AppState.unlockedStages.includes(s)) {
+            if (lockedDiv) lockedDiv.style.display = 'none';
+            if (contentDiv) contentDiv.style.display = 'block';
+            if (statusPill) {
+              const sub = AppState.stageSubmissions[s];
+              if (sub && sub.submitted) {
+                if (sub.score > 0) {
+                  statusPill.textContent = `Correct (+${sub.score} Pts)`;
+                  statusPill.className = 'stage-pill status-done';
+                } else {
+                  statusPill.textContent = 'Incorrect (0 Pts)';
+                  statusPill.className = 'stage-pill status-zero';
+                }
+              } else {
+                statusPill.textContent = 'Unlocked';
+                statusPill.className = 'stage-pill';
+              }
+            }
+          } else {
+            if (lockedDiv) lockedDiv.style.display = 'block';
+            if (contentDiv) contentDiv.style.display = 'none';
+            if (statusPill) {
+              statusPill.textContent = 'Locked';
+              statusPill.className = 'stage-pill status-locked';
+            }
+          }
+        }
+
+        applySubmittedStateIfGraded(s);
+      }
+    }
+
+    function applySubmittedStateIfGraded(s) {
+      const sub = AppState.stageSubmissions[s];
+      if (!sub || !sub.submitted) return;
+
+      const submitBtn = document.getElementById(`btn-submit-stage${s}`);
+      const resultDiv = document.getElementById(`stage${s}-result`);
+      const feedbackBanner = document.getElementById(`stage${s}-feedback-banner`);
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Answer Submitted (Locked)";
+      }
+
+      // Lock MCQs for Stages 1 to 4
+      if (s <= 4) {
+        const group = document.getElementById(`stage${s}-options`);
+        if (group) {
+          group.querySelectorAll('.mcq-radio').forEach(r => {
+            r.disabled = true;
+            if (r.value === sub.answer) {
+              r.checked = true;
+            }
+          });
+          group.querySelectorAll('.mcq-label').forEach(lbl => {
+            lbl.classList.add('locked');
+            const r = lbl.querySelector('.mcq-radio');
+            if (r) {
+              if (r.value === sub.answer) {
+                lbl.classList.add(sub.correct ? 'correct' : 'wrong');
+              }
+              // Highlight correct answer
+              const correctVals = { 1: 'opt-b', 2: 'opt-c', 3: 'opt-b', 4: 'opt-b' };
+              if (r.value === correctVals[s] && !sub.correct) {
+                lbl.classList.add('correct');
+              }
+            }
+          });
+        }
+      } else if (s === 5) {
+        // Stage 5 Text Input Box
+        const input = document.getElementById('stage5-answer');
+        if (input) {
+          input.value = sub.answer || "";
+          input.disabled = true;
+        }
+
+        // Dynamically inject the clinical card (ZERO DOM spoiler prior to submission)
+        const cardBox = document.getElementById('stage5-clinical-card');
+        if (cardBox && !cardBox.hasChildNodes()) {
+          const cardDiv = document.createElement('div');
+          cardDiv.className = 'graded-banner banner-correct';
+          cardDiv.innerHTML = `
+            <h4>Clinical Takeaway</h4>
+            <p><strong>Kala-Azar (Visceral Leishmaniasis):</strong> Rebus decoded: Kaala (Black/Charcoal) + Azhar (Mohammad Azharuddin). Caused by <em>Leishmania donovani</em> transmitted by phlebotomine sandflies. In intensive care, it frequently masquerades as septic shock or secondary hemophagocytic lymphohistiocytosis (sHLH) with prolonged fever, hepatosplenomegaly, and pancytopenia. Drug of choice: <strong>Liposomal Amphotericin B</strong>.</p>
+          `;
+          cardBox.appendChild(cardDiv);
+        }
+      }
+
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+      }
+
+      if (feedbackBanner) {
+        if (sub.score > 0) {
+          feedbackBanner.className = 'graded-banner banner-correct';
+          feedbackBanner.innerHTML = `
+            <h4>✅ Correct! +${sub.score} Points Awarded!</h4>
+            <p>Solved in <strong>${sub.timeTaken || 0} seconds</strong>. Your speed-adjusted score has been locked.</p>
+          `;
+        } else {
+          feedbackBanner.className = 'graded-banner banner-incorrect';
+          feedbackBanner.innerHTML = `
+            <h4>❌ Incorrect — 0 Points Awarded</h4>
+            <p>Your answer was incorrect. Under the strict single-attempt policy, this stage is permanently locked.</p>
+          `;
+        }
+      }
+
+      const statusPill = document.getElementById(`stage-${s}-status-pill`);
+      if (statusPill) {
+        if (sub.score > 0) {
+          statusPill.textContent = `Correct (+${sub.score} Pts)`;
+          statusPill.className = 'stage-pill status-done';
+        } else {
+          statusPill.textContent = 'Incorrect (0 Pts)';
+          statusPill.className = 'stage-pill status-zero';
+        }
+      }
+    }
+
+    function checkPasscode(stageNum) {
+      const input = document.getElementById(`passcode-${stageNum}`);
+      const errBox = document.getElementById(`passcode-${stageNum}-error`);
+      const entered = (input.value || "").trim().toUpperCase();
+      const expected = CONFIG.PASSCODES[stageNum];
+
+      if (entered === expected) {
+        SoundFX.padlockClick();
+        errBox.textContent = "";
+        input.classList.remove('error');
+        if (!AppState.unlockedStages.includes(stageNum)) {
+          AppState.unlockedStages.push(stageNum);
+        }
+        ensureStageTimer(stageNum);
+        saveState();
+        updateUI();
+      } else {
+        SoundFX.errorBuzz();
+        input.classList.add('error');
+        errBox.textContent = "Invalid passcode. Please check announcement during Break.";
+        setTimeout(() => input.classList.remove('error'), 500);
+      }
+    }
+
+    /**
+     * GRADE SINGLE ATTEMPT WITH TIME DECAY
+     */
+    function gradeStageSubmission(stageNum, rawAnswer, isCorrect) {
+      if (AppState.stageSubmissions[stageNum]?.submitted) {
+        return; // Guard: No multiple attempts!
+      }
+
+      const startTime = AppState.stageStartTimes[stageNum] || Date.now();
+      const elapsedSec = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+      
+      let points = 0;
+      if (isCorrect) {
+        points = calculateTimePoints(elapsedSec);
+      }
+
+      AppState.stageSubmissions[stageNum] = {
+        submitted: true,
+        score: points,
+        answer: rawAnswer,
+        correct: isCorrect,
+        timeTaken: elapsedSec
+      };
+
+      let newTotal = 0;
+      for (const s in AppState.stageSubmissions) {
+        newTotal += (AppState.stageSubmissions[s].score || 0);
+      }
+      AppState.score = newTotal;
+
+      if (isCorrect) {
+        SoundFX.successChord();
+      } else {
+        SoundFX.errorBuzz();
+      }
+
+      saveState();
+      updateUI();
+    }
+
+    // Live Timer Interval (Decaying Points Indicator)
+    function startLiveTimers() {
+      setInterval(() => {
+        const s = AppState.currentStage;
+        if (!AppState.stageSubmissions[s]?.submitted && AppState.unlockedStages.includes(s)) {
+          const startTime = AppState.stageStartTimes[s] || Date.now();
+          const elapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+          const potential = calculateTimePoints(elapsed);
+
+          const timerEl = document.getElementById(`stage${s}-timer`);
+          const potEl = document.getElementById(`stage${s}-potential`);
+
+          if (timerEl) {
+            timerEl.innerHTML = `⏱️ Time Elapsed: <span>${elapsed}s</span>`;
+          }
+          if (potEl) {
+            potEl.textContent = `Potential: ${potential} pts`;
+          }
+        }
+      }, 1000);
+    }
+
+    /* ========================================================
+       8. VIEW ROUTING & GLOBAL PRESENTER HOTKEYS
+       ======================================================== */
+    function switchView(viewName) {
+      const delegateView = document.getElementById('delegate-view');
+      const leaderboardView = document.getElementById('leaderboard-view');
+      const btnViewToggle = document.getElementById('btn-view-toggle');
+
+      if (viewName === 'leaderboard') {
+        delegateView.style.display = 'none';
+        leaderboardView.style.display = 'block';
+        btnViewToggle.classList.add('active');
+        document.getElementById('registration-modal').style.display = 'none';
+        renderLeaderboardView();
+        startAutoScroll();
+      } else {
+        delegateView.style.display = 'block';
+        leaderboardView.style.display = 'none';
+        btnViewToggle.classList.remove('active');
+        if (!AppState.user) {
+          document.getElementById('registration-modal').style.display = 'flex';
+        }
+        if (AppState.scrollInterval) clearInterval(AppState.scrollInterval);
+      }
+    }
+
+    function handleHashChange() {
+      if (window.location.hash === '#leaderboard') {
+        switchView('leaderboard');
+      } else {
+        switchView('delegate');
+      }
+    }
+
+    function setupGlobalHotkeys() {
+      window.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) {
+          return;
+        }
+
+        if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          toggleFreeze();
+        } else if (e.key === 'c' || e.key === 'C') {
+          e.preventDefault();
+          launchConfetti();
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function setupMCQRadioBinding(stageNum) {
+      const container = document.getElementById(`stage${stageNum}-options`);
+      if (!container) return;
+      container.querySelectorAll('.mcq-label').forEach(lbl => {
+        lbl.addEventListener('click', () => {
+          if (lbl.classList.contains('locked')) return;
+          container.querySelectorAll('.mcq-label').forEach(l => l.classList.remove('selected'));
+          lbl.classList.add('selected');
+          const radio = lbl.querySelector('.mcq-radio');
+          if (radio) radio.checked = true;
+        });
+      });
+    }
+
+    /* ========================================================
+       9. INITIALIZATION & EVENT BINDINGS
+       ======================================================== */
+    document.addEventListener("DOMContentLoaded", () => {
+      loadSavedState();
+      // Production roster initializes empty; zero mock delegates in production
+      window.participants = participants;
+
+      if (!AppState.user) {
+        document.getElementById('registration-modal').style.display = 'flex';
+      }
+
+      ensureStageTimer(1);
+      checkUrlAutoUnlock();
+      isolateInputs();
+
+      // Setup MCQ bindings for Stages 1, 2, 3, 4
+      setupMCQRadioBinding(1);
+      setupMCQRadioBinding(2);
+      setupMCQRadioBinding(3);
+      setupMCQRadioBinding(4);
+
+      // Stepper Navigation: Clicking locked stages prompts digital padlock modal
+      document.querySelectorAll('.step-node').forEach(node => {
+        node.addEventListener('click', () => {
+          const s = parseInt(node.getAttribute('data-stage'));
+          if (s === 1 || AppState.unlockedStages.includes(s)) {
+            AppState.currentStage = s;
+            ensureStageTimer(s);
+            updateUI();
+          } else {
+            openPasscodeModal(s);
+          }
+        });
+      });
+
+      // Digital Padlock Modal Event Bindings
+      document.getElementById('btn-modal-unlock').addEventListener('click', handleModalUnlock);
+      document.getElementById('btn-modal-close').addEventListener('click', closePasscodeModal);
+      document.getElementById('modal-passcode-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleModalUnlock();
+        }
+      });
+      document.getElementById('passcode-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'passcode-modal') closePasscodeModal();
+      });
+
+      // Registration Form Submission
+      const regForm = document.getElementById('registration-form');
+      regForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('reg-name').value.trim();
+        const hospital = document.getElementById('reg-hospital').value.trim();
+        const mobile = document.getElementById('reg-mobile').value.trim();
+
+        if (name && hospital && mobile) {
+          AppState.user = {
+            name: name,
+            hospital: hospital,
+            mobile: mobile,
+            timestamp: new Date().toISOString()
+          };
+          document.getElementById('registration-modal').style.display = 'none';
+          ensureStageTimer(1);
+          SoundFX.successChord();
+          saveState();
+          updateUI();
+        }
+      });
+
+      // STAGE 1: MCQ SUBMIT
+      document.getElementById('btn-submit-stage1').addEventListener('click', () => {
+        const checked = document.querySelector('input[name="stage1-opt"]:checked');
+        const err = document.getElementById('stage1-error');
+        if (!checked) {
+          err.textContent = "Please select an answer option.";
+          return;
+        }
+        err.textContent = "";
+        const isCorrect = (checked.value === 'opt-b'); // Option B: Vascular waterfall effect
+        gradeStageSubmission(1, checked.value, isCorrect);
+      });
+      document.getElementById('btn-next-stage-2').addEventListener('click', () => {
+        if (AppState.unlockedStages.includes(2)) {
+          AppState.currentStage = 2;
+          ensureStageTimer(2);
+          updateUI();
+        } else {
+          openPasscodeModal(2);
+        }
+      });
+
+      // STAGE 2: UNLOCK & MCQ SUBMIT
+      document.getElementById('btn-unlock-stage-2').addEventListener('click', () => {
+        checkPasscode(2);
+        ensureStageTimer(2);
+      });
+      document.getElementById('btn-submit-stage2').addEventListener('click', () => {
+        const checked = document.querySelector('input[name="stage2-opt"]:checked');
+        const err = document.getElementById('stage2-error');
+        if (!checked) {
+          err.textContent = "Please select an answer option.";
+          return;
+        }
+        err.textContent = "";
+        const isCorrect = (checked.value === 'opt-c'); // Option C: Univ. of Pittsburgh — ROSE Trial
+        gradeStageSubmission(2, checked.value, isCorrect);
+      });
+      document.getElementById('btn-next-stage-3').addEventListener('click', () => {
+        if (AppState.unlockedStages.includes(3)) {
+          AppState.currentStage = 3;
+          ensureStageTimer(3);
+          updateUI();
+        } else {
+          openPasscodeModal(3);
+        }
+      });
+
+      // STAGE 3: UNLOCK & MCQ SUBMIT
+      document.getElementById('btn-unlock-stage-3').addEventListener('click', () => {
+        checkPasscode(3);
+        ensureStageTimer(3);
+      });
+      document.getElementById('btn-submit-stage3').addEventListener('click', () => {
+        const checked = document.querySelector('input[name="stage3-opt"]:checked');
+        const err = document.getElementById('stage3-error');
+        if (!checked) {
+          err.textContent = "Please select an answer option.";
+          return;
+        }
+        err.textContent = "";
+        const isCorrect = (checked.value === 'opt-b'); // Option B: Bangalore Palace | KR Market
+        gradeStageSubmission(3, checked.value, isCorrect);
+      });
+      document.getElementById('btn-next-stage-4').addEventListener('click', () => {
+        if (AppState.unlockedStages.includes(4)) {
+          AppState.currentStage = 4;
+          ensureStageTimer(4);
+          updateUI();
+        } else {
+          openPasscodeModal(4);
+        }
+      });
+
+      // STAGE 4: UNLOCK & MCQ SUBMIT
+      document.getElementById('btn-unlock-stage-4').addEventListener('click', () => {
+        checkPasscode(4);
+        ensureStageTimer(4);
+      });
+      document.getElementById('btn-submit-stage4').addEventListener('click', () => {
+        const checked = document.querySelector('input[name="stage4-opt"]:checked');
+        const err = document.getElementById('stage4-error');
+        if (!checked) {
+          err.textContent = "Please select an answer option.";
+          return;
+        }
+        err.textContent = "";
+        const isCorrect = (checked.value === 'opt-b'); // Option B: HAPE & NIV
+        gradeStageSubmission(4, checked.value, isCorrect);
+      });
+      document.getElementById('btn-next-stage-5').addEventListener('click', () => {
+        if (AppState.unlockedStages.includes(5)) {
+          AppState.currentStage = 5;
+          ensureStageTimer(5);
+          updateUI();
+        } else {
+          openPasscodeModal(5);
+        }
+      });
+
+      // STAGE 5: UNLOCK & TEXT INPUT SUBMIT (THE ONLY TEXT INPUT STAGE)
+      document.getElementById('btn-unlock-stage-5').addEventListener('click', () => {
+        checkPasscode(5);
+        ensureStageTimer(5);
+      });
+      document.getElementById('btn-submit-stage5').addEventListener('click', () => {
+        const input = document.getElementById('stage5-answer');
+        const err = document.getElementById('stage5-error');
+        const raw = (input.value || "").trim();
+        if (!raw) {
+          err.textContent = "Please enter an answer before submitting.";
+          return;
+        }
+        err.textContent = "";
+
+        const norm = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Accepted answers (decoded to avoid static string matches in markup)
+        const validList = ['kalaazar', 'visceralleishmaniasis', 'leishmaniasis', 'leishmania', 'blackfever', 'kalazar'];
+        const isCorrect = validList.includes(norm) || norm.includes('kalaazar') || norm.includes('leishmani');
+
+        gradeStageSubmission(5, raw, isCorrect);
+      });
+
+      // Stage 5 View Leaderboard Button
+      document.getElementById('btn-view-stage-board').addEventListener('click', () => {
+        window.location.hash = '#leaderboard';
+      });
+
+      // Presenter HUD Controls
+      document.getElementById('btn-freeze-toggle').addEventListener('click', toggleFreeze);
+      document.getElementById('btn-confetti').addEventListener('click', launchConfetti);
+      document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+      document.getElementById('btn-back-to-hunt').addEventListener('click', () => {
+        window.location.hash = '#hunt';
+      });
+
+      // Header icon toggles
+      document.getElementById('btn-view-toggle').addEventListener('click', () => {
+        window.location.hash = (window.location.hash === '#leaderboard') ? '#hunt' : '#leaderboard';
+      });
+
+      document.getElementById('btn-audio-toggle').addEventListener('click', () => {
+        AppState.soundMuted = !AppState.soundMuted;
+        document.getElementById('btn-audio-toggle').textContent = AppState.soundMuted ? '🔇' : '🔊';
+      });
+
+      // BroadcastChannel receiver
+      syncChannel.onmessage = (event) => {
+        if (event.data && event.data.type === "USER_UPDATE") {
+          const incoming = event.data;
+          const idx = participants.findIndex(d => d.mobile === incoming.user.mobile);
+          if (idx >= 0) {
+            participants[idx].score = incoming.score;
+            participants[idx].stagesCompleted = incoming.stagesCompleted;
+            participants[idx].totalTimeTaken = incoming.totalTimeTaken;
+          } else {
+            participants.unshift({
+              id: 'del-sync-' + Date.now(),
+              name: incoming.user.name,
+              hospital: incoming.user.hospital,
+              mobile: incoming.user.mobile,
+              stagesCompleted: incoming.stagesCompleted,
+              score: incoming.score,
+              totalTimeTaken: incoming.totalTimeTaken,
+              timestamp: incoming.timestamp,
+              isCurrentUser: false
+            });
+          }
+          if (window.location.hash === '#leaderboard') {
+            renderLeaderboardView();
+          }
+        }
+      };
+
+      setupGlobalHotkeys();
+      window.addEventListener('hashchange', handleHashChange);
+      handleHashChange();
+      updateUI();
+      startLiveTimers();
+    });
+  </script>
+</body>
+</html>

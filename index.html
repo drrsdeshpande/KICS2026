@@ -1773,6 +1773,14 @@
           stageStartTimes: AppState.stageStartTimes,
           stageSubmissions: AppState.stageSubmissions
         }));
+        localStorage.setItem("kics_app_state", JSON.stringify({
+          user: AppState.user,
+          unlockedStages: AppState.unlockedStages,
+          currentStage: AppState.currentStage,
+          score: AppState.score,
+          stageStartTimes: AppState.stageStartTimes,
+          stageSubmissions: AppState.stageSubmissions
+        }));
 
         const submittedCount = Object.keys(AppState.stageSubmissions).length;
         let totalElapsed = 0;
@@ -1848,6 +1856,92 @@
         }
       }
     }
+
+    /* ========================================================
+       4B. PHONE-NUMBER SESSION RECOVERY & RE-HYDRATION
+       ======================================================== */
+    function normalizePhone(phone) {
+      if (!phone) return "";
+      const digits = String(phone).replace(/\D/g, '');
+      return digits.length > 10 ? digits.slice(-10) : digits;
+    }
+
+    function showToast(message, duration = 5000) {
+      let toast = document.getElementById('session-recovery-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'session-recovery-toast';
+        toast.className = 'session-toast';
+        toast.style.cssText = `
+          position: fixed;
+          top: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(2, 132, 199, 0.95));
+          border: 1px solid #38bdf8;
+          color: #ffffff;
+          padding: 12px 24px;
+          border-radius: 9999px;
+          font-size: 14px;
+          font-weight: 700;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(14, 165, 233, 0.4);
+          z-index: 10000;
+          text-align: center;
+          max-width: 90vw;
+          pointer-events: none;
+          transition: opacity 0.3s ease;
+        `;
+        document.body.appendChild(toast);
+      }
+      toast.textContent = message;
+      toast.style.display = 'block';
+      toast.style.opacity = '1';
+
+      const pill = document.getElementById('auto-unlock-pill');
+      if (pill) {
+        pill.textContent = message;
+        pill.style.display = 'block';
+      }
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => { toast.style.display = 'none'; }, 300);
+        if (pill) pill.style.display = 'none';
+      }, duration);
+    }
+
+    async function checkExistingCloudSession(mobile) {
+      if (!CONFIG.WEBHOOK_URL || !mobile) return null;
+      const targetPhone = normalizePhone(mobile);
+      if (!targetPhone) return null;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      try {
+        const res = await fetch(CONFIG.WEBHOOK_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!Array.isArray(data)) return null;
+
+        const match = data.find(p => {
+          if (!p) return false;
+          const pPhone = normalizePhone(p.mobile || (p.user && p.user.mobile));
+          return pPhone && pPhone === targetPhone;
+        });
+
+        return match || null;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.warn("Session recovery check bypassed (failsafe triggered):", err.message);
+        return null;
+      }
+    }
+
+    window.normalizePhone = normalizePhone;
+    window.showToast = showToast;
+    window.checkExistingCloudSession = checkExistingCloudSession;
 
     /* ========================================================
        5. PRODUCTION LEADERBOARD ROSTER (ZERO MOCK DATA)
@@ -2620,20 +2714,82 @@
           window.isSubmitting = true;
           if (regBtn) regBtn.disabled = true;
 
-          AppState.user = {
-            name: name,
-            hospital: hospital,
-            mobile: mobile,
-            timestamp: new Date().toISOString()
-          };
-          document.getElementById('registration-modal').style.display = 'none';
-          ensureStageTimer(1);
-          SoundFX.successChord();
-
-          const networkPromise = saveState();
           const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
 
-          updateUI();
+          // 1. Check if cloud webhook contains an existing session for this phone number
+          const existing = await checkExistingCloudSession(mobile);
+
+          let networkPromise = null;
+
+          if (existing) {
+            // RESTORE EXISTING SESSION
+            const restoredName = existing.name || (existing.user && existing.user.name) || name;
+            const restoredHospital = existing.hospital || (existing.user && existing.user.hospital) || hospital;
+            const restoredScore = typeof existing.score === 'number' ? existing.score : parseInt(existing.score || 0, 10) || 0;
+            const restoredStages = typeof existing.stages === 'number' ? existing.stages : (typeof existing.stagesCompleted === 'number' ? existing.stagesCompleted : parseInt(existing.stages || 0, 10)) || 0;
+            const restoredTime = typeof existing.totalTimeTaken === 'number' ? existing.totalTimeTaken : parseInt(existing.totalTimeTaken || 0, 10) || 0;
+            const N = Math.min(5, Math.max(0, restoredStages));
+
+            AppState.user = {
+              name: restoredName,
+              hospital: restoredHospital,
+              mobile: mobile,
+              timestamp: existing.timestamp || new Date().toISOString()
+            };
+            AppState.score = restoredScore;
+
+            // Mark stages 1 through N as completed and locked/solved
+            const correctAnswers = { 1: 'opt-b', 2: 'opt-c', 3: 'opt-b', 4: 'opt-b', 5: 'kalaazar' };
+            const basePts = N > 0 ? Math.floor(restoredScore / N) : 0;
+            const remPts = N > 0 ? (restoredScore % N) : 0;
+            const baseTime = N > 0 ? Math.floor(restoredTime / N) : 0;
+            const remTime = N > 0 ? (restoredTime % N) : 0;
+
+            for (let s = 1; s <= N; s++) {
+              if (!AppState.unlockedStages.includes(s)) {
+                AppState.unlockedStages.push(s);
+              }
+              const stagePts = basePts + (s <= remPts ? 1 : 0);
+              const stageTime = baseTime + (s <= remTime ? 1 : 0);
+              AppState.stageSubmissions[s] = {
+                submitted: true,
+                score: stagePts,
+                answer: correctAnswers[s] || "Restored Answer",
+                correct: (stagePts > 0),
+                timeTaken: stageTime
+              };
+            }
+
+            // Route directly to active hunt screen (not Stage 1 blank)
+            const targetStage = Math.min(5, Math.max(1, N < 5 ? N + 1 : 5));
+            AppState.currentStage = targetStage;
+            ensureStageTimer(targetStage);
+
+            document.getElementById('registration-modal').style.display = 'none';
+            SoundFX.successChord();
+
+            networkPromise = saveState();
+            updateUI();
+
+            let displayName = restoredName.replace(/^dr\.?\s+/i, '').trim();
+            if (!displayName) displayName = name.replace(/^dr\.?\s+/i, '').trim() || "Delegate";
+            showToast(`Welcome back, Dr. ${displayName}! Restored progress: ${N}/5 stages completed.`);
+
+          } else {
+            // FRESH REGISTRATION
+            AppState.user = {
+              name: name,
+              hospital: hospital,
+              mobile: mobile,
+              timestamp: new Date().toISOString()
+            };
+            document.getElementById('registration-modal').style.display = 'none';
+            ensureStageTimer(1);
+            SoundFX.successChord();
+
+            networkPromise = saveState();
+            updateUI();
+          }
 
           await Promise.race([networkPromise, minDelayPromise]);
           isSubmitting = false;

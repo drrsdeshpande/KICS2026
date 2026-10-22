@@ -73,8 +73,9 @@ async function runAntiDoubleSubmitTests() {
     console.log(`  Registration button disabled immediately: ${regResult.disabledAfterClick1}`);
     console.log(`  window.isSubmitting set to true: ${regResult.isSubmittingAfterClick1}`);
 
-    // Wait 1.8s for lock window to elapse
-    await page.waitForTimeout(1800);
+    // Wait for recovery check and registration lock window to elapse
+    await page.waitForFunction(() => window.isSubmitting === false, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(300);
 
     const isSubmittingReset = await page.evaluate(() => window.isSubmitting === false);
     console.log(`  window.isSubmitting reset after lock window: ${isSubmittingReset}`);

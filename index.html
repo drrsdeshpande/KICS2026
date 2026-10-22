@@ -1040,7 +1040,7 @@
         </div>
         <div class="form-group">
           <label for="reg-mobile">Mobile Number</label>
-          <input type="tel" id="reg-mobile" class="form-input" placeholder="Enter mobile number" value="" required>
+          <input type="tel" id="reg-mobile" class="form-input" placeholder="Enter mobile number" value="">
         </div>
         <button type="submit" class="action-btn" id="btn-start-hunt">
           <span>Enter Treasure Hunt</span> 🚀
@@ -1347,15 +1347,15 @@
     <!-- STAGE 4: PICTURE PUZZLE (MCQ) -->
     <section class="stage-card" id="stage-card-4" style="display: none;">
       <div class="stage-card-header">
-        <span class="stage-pill">Break 4 • Picture Puzzle</span>
+        <span class="stage-pill">Day 2 • Break 4 • Picture Puzzle</span>
         <span class="stage-pill status-locked" id="stage-4-status-pill">Locked</span>
       </div>
       <div class="stage-card-body">
         <!-- Locked View -->
         <div id="stage4-locked" class="locked-view">
           <div class="lock-icon-wrapper">🔒</div>
-          <h3 class="lock-title">Stage 4 is Locked</h3>
-          <p class="lock-subtitle">Enter the secret passcode revealed during Break 4 in the auditorium or scan the Break 4 QR code.</p>
+          <h3 class="lock-title">Stage 4 is Locked (Day 2)</h3>
+          <p class="lock-subtitle">Enter the secret passcode revealed during Day 2 Break 4 in the auditorium or scan the Break 4 QR code.</p>
           <div class="passcode-form">
             <div class="passcode-input-wrapper">
               <input type="text" id="passcode-4" class="passcode-input" placeholder="ENTER PASSCODE" value="" maxlength="20" autocomplete="off">
@@ -1609,6 +1609,7 @@
       currentStage: 1,
       unlockedStages: [1],
       score: 0,
+      totalTimeTaken: 0,
       stageStartTimes: {},   // { 1: timestamp, 2: timestamp, ... }
       stageSubmissions: {},  // { 1: { submitted: true, score: 980, timeTaken: 2, answer: "...", correct: true } }
       soundMuted: false,
@@ -1743,10 +1744,13 @@
           AppState.stageSubmissions = parsed.stageSubmissions || {};
 
           let totalScore = 0;
+          let calculatedTime = 0;
           for (const s in AppState.stageSubmissions) {
             totalScore += (AppState.stageSubmissions[s].score || 0);
+            calculatedTime += (AppState.stageSubmissions[s].timeTaken || 0);
           }
-          AppState.score = totalScore;
+          AppState.score = (parsed.score !== undefined) ? parsed.score : totalScore;
+          AppState.totalTimeTaken = (parsed.totalTimeTaken !== undefined) ? parsed.totalTimeTaken : calculatedTime;
         }
 
         const storedParticipants = localStorage.getItem("participants") || localStorage.getItem("kics_participants");
@@ -1770,6 +1774,7 @@
           unlockedStages: AppState.unlockedStages,
           currentStage: AppState.currentStage,
           score: AppState.score,
+          totalTimeTaken: AppState.totalTimeTaken,
           stageStartTimes: AppState.stageStartTimes,
           stageSubmissions: AppState.stageSubmissions
         }));
@@ -1778,6 +1783,7 @@
           unlockedStages: AppState.unlockedStages,
           currentStage: AppState.currentStage,
           score: AppState.score,
+          totalTimeTaken: AppState.totalTimeTaken,
           stageStartTimes: AppState.stageStartTimes,
           stageSubmissions: AppState.stageSubmissions
         }));
@@ -1910,10 +1916,13 @@
       }, duration);
     }
 
-    async function checkExistingCloudSession(mobile) {
-      if (!CONFIG.WEBHOOK_URL || !mobile) return null;
-      const targetPhone = normalizePhone(mobile);
-      if (!targetPhone) return null;
+    async function checkExistingCloudSession(enteredPhone, enteredName) {
+      if (!CONFIG.WEBHOOK_URL) return null;
+
+      const normalizedEnteredPhone = (enteredPhone || "").toString().replace(/\D/g, '');
+      const cleanEnteredName = (enteredName || "").toString().trim().toLowerCase();
+
+      if (!normalizedEnteredPhone && !cleanEnteredName) return null;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -1925,10 +1934,30 @@
         const data = await res.json();
         if (!Array.isArray(data)) return null;
 
+        // Dual Match Check (Phone OR Name):
+        // 1. p.phone && p.phone.replace(/\D/g, '') === normalizedEnteredPhone
+        // 2. OR (if phone is empty) p.name.trim().toLowerCase() === enteredName.trim().toLowerCase()
         const match = data.find(p => {
           if (!p) return false;
-          const pPhone = normalizePhone(p.mobile || (p.user && p.user.mobile));
-          return pPhone && pPhone === targetPhone;
+          const rawPhone = (p.phone !== undefined ? p.phone : (p.mobile !== undefined ? p.mobile : (p.user && (p.user.phone || p.user.mobile)))) || "";
+          const pPhoneClean = rawPhone.toString().replace(/\D/g, '');
+          const pNameClean = (p.name || (p.user && p.user.name) || "").toString().trim().toLowerCase();
+
+          if (normalizedEnteredPhone) {
+            if (pPhoneClean) {
+              return (
+                pPhoneClean === normalizedEnteredPhone ||
+                pPhoneClean.endsWith(normalizedEnteredPhone) ||
+                normalizedEnteredPhone.endsWith(pPhoneClean)
+              );
+            }
+            return false;
+          } else {
+            // Phone is empty: check Name
+            if (!pNameClean || !cleanEnteredName) return false;
+            const stripDr = (s) => s.replace(/^dr\.?\s+/i, '').trim();
+            return (pNameClean === cleanEnteredName) || (stripDr(pNameClean) === stripDr(cleanEnteredName));
+          }
         });
 
         return match || null;
@@ -2708,7 +2737,7 @@
         const hospital = (hospInput.value || "").trim();
         const mobile = (mobInput.value || "").trim();
 
-        if (name && hospital && mobile) {
+        if (name && hospital) {
           // Immediately disable submit button & set flag
           isSubmitting = true;
           window.isSubmitting = true;
@@ -2716,27 +2745,29 @@
 
           const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
 
-          // 1. Check if cloud webhook contains an existing session for this phone number
-          const existing = await checkExistingCloudSession(mobile);
+          // 1. Dual Match Check (Phone OR Name)
+          const match = await checkExistingCloudSession(mobile, name);
 
           let networkPromise = null;
 
-          if (existing) {
+          if (match) {
             // RESTORE EXISTING SESSION
-            const restoredName = existing.name || (existing.user && existing.user.name) || name;
-            const restoredHospital = existing.hospital || (existing.user && existing.user.hospital) || hospital;
-            const restoredScore = typeof existing.score === 'number' ? existing.score : parseInt(existing.score || 0, 10) || 0;
-            const restoredStages = typeof existing.stages === 'number' ? existing.stages : (typeof existing.stagesCompleted === 'number' ? existing.stagesCompleted : parseInt(existing.stages || 0, 10)) || 0;
-            const restoredTime = typeof existing.totalTimeTaken === 'number' ? existing.totalTimeTaken : parseInt(existing.totalTimeTaken || 0, 10) || 0;
-            const N = Math.min(5, Math.max(0, restoredStages));
+            const restoredName = match.name || (match.user && match.user.name) || name;
+            const restoredHospital = match.hospital || (match.user && match.user.hospital) || hospital;
+            const restoredPhone = match.phone || match.mobile || (match.user && (match.user.phone || match.user.mobile)) || mobile;
+            const restoredScore = typeof match.score === 'number' ? match.score : (parseInt(match.score, 10) || 0);
+            const restoredTime = typeof match.totalTimeTaken === 'number' ? match.totalTimeTaken : (parseInt(match.totalTimeTaken, 10) || 0);
+            const matchStages = typeof match.stages === 'number' ? match.stages : (typeof match.stagesCompleted === 'number' ? match.stagesCompleted : parseInt(match.stages, 10)) || 0;
+            const N = Math.min(5, Math.max(0, matchStages));
 
             AppState.user = {
               name: restoredName,
               hospital: restoredHospital,
-              mobile: mobile,
-              timestamp: existing.timestamp || new Date().toISOString()
+              mobile: restoredPhone,
+              timestamp: match.timestamp || new Date().toISOString()
             };
             AppState.score = restoredScore;
+            AppState.totalTimeTaken = restoredTime;
 
             // Mark stages 1 through N as completed and locked/solved
             const correctAnswers = { 1: 'opt-b', 2: 'opt-c', 3: 'opt-b', 4: 'opt-b', 5: 'kalaazar' };
@@ -2760,10 +2791,13 @@
               };
             }
 
-            // Route directly to active hunt screen (not Stage 1 blank)
-            const targetStage = Math.min(5, Math.max(1, N < 5 ? N + 1 : 5));
+            // Set current active stage to match.stages + 1 (or show Day 2 locked screen if match.stages === 3)
+            const nextStage = matchStages + 1;
+            const targetStage = Math.min(5, Math.max(1, nextStage));
             AppState.currentStage = targetStage;
-            ensureStageTimer(targetStage);
+            if (AppState.unlockedStages.includes(targetStage)) {
+              ensureStageTimer(targetStage);
+            }
 
             document.getElementById('registration-modal').style.display = 'none';
             SoundFX.successChord();
@@ -2771,9 +2805,9 @@
             networkPromise = saveState();
             updateUI();
 
-            let displayName = restoredName.replace(/^dr\.?\s+/i, '').trim();
+            let displayName = (restoredName || name).replace(/^dr\.?\s+/i, '').trim();
             if (!displayName) displayName = name.replace(/^dr\.?\s+/i, '').trim() || "Delegate";
-            showToast(`Welcome back, Dr. ${displayName}! Restored progress: ${N}/5 stages completed.`);
+            showToast(`Welcome back, Dr. ${displayName}! Resuming at Stage ${nextStage} with ${restoredScore} pts.`);
 
           } else {
             // FRESH REGISTRATION
@@ -2784,7 +2818,7 @@
               timestamp: new Date().toISOString()
             };
             document.getElementById('registration-modal').style.display = 'none';
-            ensureStageTimer(1);
+            ensureStageTimer(AppState.currentStage || 1);
             SoundFX.successChord();
 
             networkPromise = saveState();

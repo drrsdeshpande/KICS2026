@@ -63,6 +63,26 @@ async function runTests() {
   const browser = await chromium.launch({ headless: true });
   const results = [];
 
+  async function createContext() {
+    const ctx = await browser.newContext();
+    await ctx.route('https://script.google.com/macros/s/**', async route => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([])
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'success' })
+        });
+      }
+    });
+    return ctx;
+  }
+
   try {
     // ------------------------------------------------------------
     // TEST 1: PASSCODE LOCKDOWN & ANTI-AUTO-PROGRESSION
@@ -70,7 +90,7 @@ async function runTests() {
     console.log("------------------------------------------------------------");
     console.log("TEST 1: Passcode Lockdown Test (Anti-Auto-Progression)");
     console.log("------------------------------------------------------------");
-    const ctx1 = await browser.newContext();
+    const ctx1 = await createContext();
     const page1 = await ctx1.newPage();
     await page1.goto(`${BASE_URL}/#hunt`);
 
@@ -81,7 +101,7 @@ async function runTests() {
       await page1.fill('#reg-hospital', 'Narayana Institute of Cardiac Sciences');
       await page1.fill('#reg-mobile', '9845012345');
       await page1.click('#btn-start-hunt');
-      await page1.waitForTimeout(1600); // Allow 1.5s anti-double-submission registration lock to complete
+      await page1.waitForSelector('#registration-modal', { state: 'hidden' });
     }
 
     // Solve Stage 1 with correct answer Option B
@@ -148,7 +168,7 @@ async function runTests() {
     console.log("\n------------------------------------------------------------");
     console.log("TEST 2: URL Parameter Auto-Unlock Test (?unlock=VIDHANA1956)");
     console.log("------------------------------------------------------------");
-    const ctx2 = await browser.newContext();
+    const ctx2 = await createContext();
     const page2 = await ctx2.newPage();
     await page2.goto(`${BASE_URL}/?unlock=VIDHANA1956#hunt`);
     await page2.waitForTimeout(500);
@@ -177,7 +197,7 @@ async function runTests() {
       await page2.fill('#reg-hospital', 'Aster CMI Hospital Hebbal');
       await page2.fill('#reg-mobile', '9845077777');
       await page2.click('#btn-start-hunt');
-      await page2.waitForTimeout(1600); // Allow 1.5s anti-double-submission registration lock to complete
+      await page2.waitForSelector('#registration-modal', { state: 'hidden' });
     }
 
     // On the same page2 (already on Stage 3), select WRONG Option A
@@ -225,7 +245,7 @@ async function runTests() {
     console.log("\n------------------------------------------------------------");
     console.log("TEST 4: Dynamic Time-Decay Scoring Test (~950 pts after 5s)");
     console.log("------------------------------------------------------------");
-    const ctx4 = await browser.newContext();
+    const ctx4 = await createContext();
     const page4 = await ctx4.newPage();
     await page4.goto(`${BASE_URL}/#hunt`);
 
@@ -235,7 +255,7 @@ async function runTests() {
       await page4.fill('#reg-hospital', 'Manipal Hospital Sarjapur Road');
       await page4.fill('#reg-mobile', '9845099999');
       await page4.click('#btn-start-hunt');
-      await page4.waitForTimeout(200);
+      await page4.waitForSelector('#registration-modal', { state: 'hidden' });
     }
 
     console.log("  Waiting exactly 5 seconds on Stage 1 to test decay formula: max(200, 1000 - 5*10)...");
@@ -258,7 +278,7 @@ async function runTests() {
     console.log("\n------------------------------------------------------------");
     console.log("TEST 5: Zero-Spoiler DOM Test on Stage 5");
     console.log("------------------------------------------------------------");
-    const ctx5 = await browser.newContext();
+    const ctx5 = await createContext();
     const page5 = await ctx5.newPage();
     await page5.goto(`${BASE_URL}/#hunt`);
 
@@ -295,7 +315,7 @@ async function runTests() {
     console.log("\n------------------------------------------------------------");
     console.log("TEST 6: Production Roster Purity & 100-Delegate Scale Test");
     console.log("------------------------------------------------------------");
-    const ctx6 = await browser.newContext();
+    const ctx6 = await createContext();
     const page6 = await ctx6.newPage();
     await page6.goto(`${BASE_URL}/#leaderboard`);
     await page6.waitForTimeout(500);

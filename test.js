@@ -81,7 +81,7 @@ async function runTests() {
       await page1.fill('#reg-hospital', 'Narayana Institute of Cardiac Sciences');
       await page1.fill('#reg-mobile', '9845012345');
       await page1.click('#btn-start-hunt');
-      await page1.waitForTimeout(300);
+      await page1.waitForTimeout(1600); // Allow 1.5s anti-double-submission registration lock to complete
     }
 
     // Solve Stage 1 with correct answer Option B
@@ -177,7 +177,7 @@ async function runTests() {
       await page2.fill('#reg-hospital', 'Aster CMI Hospital Hebbal');
       await page2.fill('#reg-mobile', '9845077777');
       await page2.click('#btn-start-hunt');
-      await page2.waitForTimeout(300);
+      await page2.waitForTimeout(1600); // Allow 1.5s anti-double-submission registration lock to complete
     }
 
     // On the same page2 (already on Stage 3), select WRONG Option A

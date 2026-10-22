@@ -1601,6 +1601,9 @@
       }
     };
 
+    let isSubmitting = false;
+    window.isSubmitting = false;
+
     let AppState = {
       user: null,
       currentStage: 1,
@@ -1786,20 +1789,21 @@
           timestamp: new Date().toISOString()
         });
 
-        pushDelegateToCloud();
+        return pushDelegateToCloud();
       } catch (e) {
         console.error("Storage save error:", e);
+        return Promise.resolve();
       }
     }
 
     function pushDelegateToCloud() {
-      if (!CONFIG.WEBHOOK_URL || !AppState.user) return;
+      if (!CONFIG.WEBHOOK_URL || !AppState.user) return Promise.resolve();
       const submittedCount = Object.keys(AppState.stageSubmissions).length;
       let totalElapsed = 0;
       for (const s in AppState.stageSubmissions) {
         totalElapsed += (AppState.stageSubmissions[s].timeTaken || 0);
       }
-      fetch(CONFIG.WEBHOOK_URL, {
+      return fetch(CONFIG.WEBHOOK_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
@@ -2408,7 +2412,7 @@
      */
     function gradeStageSubmission(stageNum, rawAnswer, isCorrect) {
       if (AppState.stageSubmissions[stageNum]?.submitted) {
-        return; // Guard: No multiple attempts!
+        return Promise.resolve(); // Guard: No multiple attempts!
       }
 
       const startTime = AppState.stageStartTimes[stageNum] || Date.now();
@@ -2439,8 +2443,9 @@
         SoundFX.errorBuzz();
       }
 
-      saveState();
+      const pushPromise = saveState();
       updateUI();
+      return pushPromise;
     }
 
     // Live Timer Interval (Decaying Points Indicator)
@@ -2595,13 +2600,26 @@
 
       // Registration Form Submission
       const regForm = document.getElementById('registration-form');
-      regForm.addEventListener('submit', (e) => {
+      const regBtn = document.getElementById('btn-start-hunt');
+
+      regForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = document.getElementById('reg-name').value.trim();
-        const hospital = document.getElementById('reg-hospital').value.trim();
-        const mobile = document.getElementById('reg-mobile').value.trim();
+        if (isSubmitting) return;
+
+        const nameInput = document.getElementById('reg-name');
+        const hospInput = document.getElementById('reg-hospital');
+        const mobInput = document.getElementById('reg-mobile');
+
+        const name = (nameInput.value || "").trim();
+        const hospital = (hospInput.value || "").trim();
+        const mobile = (mobInput.value || "").trim();
 
         if (name && hospital && mobile) {
+          // Immediately disable submit button & set flag
+          isSubmitting = true;
+          window.isSubmitting = true;
+          if (regBtn) regBtn.disabled = true;
+
           AppState.user = {
             name: name,
             hospital: hospital,
@@ -2611,23 +2629,57 @@
           document.getElementById('registration-modal').style.display = 'none';
           ensureStageTimer(1);
           SoundFX.successChord();
-          saveState();
-          pushDelegateToCloud();
+
+          const networkPromise = saveState();
+          const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
+
           updateUI();
+
+          await Promise.race([networkPromise, minDelayPromise]);
+          isSubmitting = false;
+          window.isSubmitting = false;
+          if (regBtn) regBtn.disabled = false;
         }
       });
 
+      // Unified Anti-Double-Submission Handler
+      async function handleStageSubmit(stageNum, btn, answerGetter) {
+        if (isSubmitting) return;
+        if (AppState.stageSubmissions[stageNum]?.submitted) return;
+
+        const result = answerGetter();
+        if (!result || !result.valid) return;
+
+        // Immediately disable submission button & set flag
+        isSubmitting = true;
+        window.isSubmitting = true;
+        if (btn) btn.disabled = true;
+
+        const networkPromise = gradeStageSubmission(stageNum, result.rawAnswer, result.isCorrect);
+        const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
+
+        await Promise.race([networkPromise, minDelayPromise]);
+        isSubmitting = false;
+        window.isSubmitting = false;
+      }
+
       // STAGE 1: MCQ SUBMIT
-      document.getElementById('btn-submit-stage1').addEventListener('click', () => {
-        const checked = document.querySelector('input[name="stage1-opt"]:checked');
-        const err = document.getElementById('stage1-error');
-        if (!checked) {
-          err.textContent = "Please select an answer option.";
-          return;
-        }
-        err.textContent = "";
-        const isCorrect = (checked.value === 'opt-b'); // Option B: Vascular waterfall effect
-        gradeStageSubmission(1, checked.value, isCorrect);
+      const btnSubmit1 = document.getElementById('btn-submit-stage1');
+      btnSubmit1.addEventListener('click', () => {
+        handleStageSubmit(1, btnSubmit1, () => {
+          const checked = document.querySelector('input[name="stage1-opt"]:checked');
+          const err = document.getElementById('stage1-error');
+          if (!checked) {
+            err.textContent = "Please select an answer option.";
+            return { valid: false };
+          }
+          err.textContent = "";
+          return {
+            valid: true,
+            rawAnswer: checked.value,
+            isCorrect: (checked.value === 'opt-b')
+          };
+        });
       });
       document.getElementById('btn-next-stage-2').addEventListener('click', () => {
         if (AppState.unlockedStages.includes(2)) {
@@ -2644,16 +2696,22 @@
         checkPasscode(2);
         ensureStageTimer(2);
       });
-      document.getElementById('btn-submit-stage2').addEventListener('click', () => {
-        const checked = document.querySelector('input[name="stage2-opt"]:checked');
-        const err = document.getElementById('stage2-error');
-        if (!checked) {
-          err.textContent = "Please select an answer option.";
-          return;
-        }
-        err.textContent = "";
-        const isCorrect = (checked.value === 'opt-c'); // Option C: Univ. of Pittsburgh — ROSE Trial
-        gradeStageSubmission(2, checked.value, isCorrect);
+      const btnSubmit2 = document.getElementById('btn-submit-stage2');
+      btnSubmit2.addEventListener('click', () => {
+        handleStageSubmit(2, btnSubmit2, () => {
+          const checked = document.querySelector('input[name="stage2-opt"]:checked');
+          const err = document.getElementById('stage2-error');
+          if (!checked) {
+            err.textContent = "Please select an answer option.";
+            return { valid: false };
+          }
+          err.textContent = "";
+          return {
+            valid: true,
+            rawAnswer: checked.value,
+            isCorrect: (checked.value === 'opt-c')
+          };
+        });
       });
       document.getElementById('btn-next-stage-3').addEventListener('click', () => {
         if (AppState.unlockedStages.includes(3)) {
@@ -2670,16 +2728,22 @@
         checkPasscode(3);
         ensureStageTimer(3);
       });
-      document.getElementById('btn-submit-stage3').addEventListener('click', () => {
-        const checked = document.querySelector('input[name="stage3-opt"]:checked');
-        const err = document.getElementById('stage3-error');
-        if (!checked) {
-          err.textContent = "Please select an answer option.";
-          return;
-        }
-        err.textContent = "";
-        const isCorrect = (checked.value === 'opt-b'); // Option B: Bangalore Palace | KR Market
-        gradeStageSubmission(3, checked.value, isCorrect);
+      const btnSubmit3 = document.getElementById('btn-submit-stage3');
+      btnSubmit3.addEventListener('click', () => {
+        handleStageSubmit(3, btnSubmit3, () => {
+          const checked = document.querySelector('input[name="stage3-opt"]:checked');
+          const err = document.getElementById('stage3-error');
+          if (!checked) {
+            err.textContent = "Please select an answer option.";
+            return { valid: false };
+          }
+          err.textContent = "";
+          return {
+            valid: true,
+            rawAnswer: checked.value,
+            isCorrect: (checked.value === 'opt-b')
+          };
+        });
       });
       document.getElementById('btn-next-stage-4').addEventListener('click', () => {
         if (AppState.unlockedStages.includes(4)) {
@@ -2696,16 +2760,22 @@
         checkPasscode(4);
         ensureStageTimer(4);
       });
-      document.getElementById('btn-submit-stage4').addEventListener('click', () => {
-        const checked = document.querySelector('input[name="stage4-opt"]:checked');
-        const err = document.getElementById('stage4-error');
-        if (!checked) {
-          err.textContent = "Please select an answer option.";
-          return;
-        }
-        err.textContent = "";
-        const isCorrect = (checked.value === 'opt-b'); // Option B: HAPE & NIV
-        gradeStageSubmission(4, checked.value, isCorrect);
+      const btnSubmit4 = document.getElementById('btn-submit-stage4');
+      btnSubmit4.addEventListener('click', () => {
+        handleStageSubmit(4, btnSubmit4, () => {
+          const checked = document.querySelector('input[name="stage4-opt"]:checked');
+          const err = document.getElementById('stage4-error');
+          if (!checked) {
+            err.textContent = "Please select an answer option.";
+            return { valid: false };
+          }
+          err.textContent = "";
+          return {
+            valid: true,
+            rawAnswer: checked.value,
+            isCorrect: (checked.value === 'opt-b')
+          };
+        });
       });
       document.getElementById('btn-next-stage-5').addEventListener('click', () => {
         if (AppState.unlockedStages.includes(5)) {
@@ -2722,23 +2792,37 @@
         checkPasscode(5);
         ensureStageTimer(5);
       });
-      document.getElementById('btn-submit-stage5').addEventListener('click', () => {
-        const input = document.getElementById('stage5-answer');
-        const err = document.getElementById('stage5-error');
-        const raw = (input.value || "").trim();
-        if (!raw) {
-          err.textContent = "Please enter an answer before submitting.";
-          return;
-        }
-        err.textContent = "";
+      const btnSubmit5 = document.getElementById('btn-submit-stage5');
+      const stage5Input = document.getElementById('stage5-answer');
+      btnSubmit5.addEventListener('click', () => {
+        handleStageSubmit(5, btnSubmit5, () => {
+          const err = document.getElementById('stage5-error');
+          const raw = (stage5Input.value || "").trim();
+          if (!raw) {
+            err.textContent = "Please enter an answer before submitting.";
+            return { valid: false };
+          }
+          err.textContent = "";
 
-        const norm = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
-        // Accepted answers (decoded to avoid static string matches in markup)
-        const validList = ['kalaazar', 'visceralleishmaniasis', 'leishmaniasis', 'leishmania', 'blackfever', 'kalazar'];
-        const isCorrect = validList.includes(norm) || norm.includes('kalaazar') || norm.includes('leishmani');
-
-        gradeStageSubmission(5, raw, isCorrect);
+          const norm = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const validList = ['kalaazar', 'visceralleishmaniasis', 'leishmaniasis', 'leishmania', 'blackfever', 'kalazar'];
+          const isCorrect = validList.includes(norm) || norm.includes('kalaazar') || norm.includes('leishmani');
+          return {
+            valid: true,
+            rawAnswer: raw,
+            isCorrect: isCorrect
+          };
+        });
       });
+
+      if (stage5Input) {
+        stage5Input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            btnSubmit5.click();
+          }
+        });
+      }
 
       // Stage 5 View Leaderboard Button
       document.getElementById('btn-view-stage-board').addEventListener('click', () => {

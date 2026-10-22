@@ -35,7 +35,7 @@ async function verifyCloudLeaderboard() {
     if (regVisible) {
       await page.fill('#reg-name', 'Dr. Local Isolated User');
       await page.fill('#reg-hospital', 'Private Isolated Clinic');
-      await page.fill('#reg-mobile', '9999900000');
+      await page.fill('#playerPhone', '9999900000');
       await page.click('#btn-start-hunt');
       await page.waitForTimeout(300);
     }

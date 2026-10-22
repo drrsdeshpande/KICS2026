@@ -99,7 +99,7 @@ async function runTests() {
     if (regVisible) {
       await page1.fill('#reg-name', 'Dr. Test Examiner');
       await page1.fill('#reg-hospital', 'Narayana Institute of Cardiac Sciences');
-      await page1.fill('#reg-mobile', '9845012345');
+      await page1.fill('#playerPhone', '9845012345');
       await page1.click('#btn-start-hunt');
       await page1.waitForSelector('#registration-modal', { state: 'hidden' });
     }
@@ -195,7 +195,7 @@ async function runTests() {
     if (await page2.isVisible('#registration-modal')) {
       await page2.fill('#reg-name', 'Dr. Bengaluru Tester');
       await page2.fill('#reg-hospital', 'Aster CMI Hospital Hebbal');
-      await page2.fill('#reg-mobile', '9845077777');
+      await page2.fill('#playerPhone', '9845077777');
       await page2.click('#btn-start-hunt');
       await page2.waitForSelector('#registration-modal', { state: 'hidden' });
     }
@@ -253,7 +253,7 @@ async function runTests() {
     if (reg4Visible) {
       await page4.fill('#reg-name', 'Dr. Speed Tester');
       await page4.fill('#reg-hospital', 'Manipal Hospital Sarjapur Road');
-      await page4.fill('#reg-mobile', '9845099999');
+      await page4.fill('#playerPhone', '9845099999');
       await page4.click('#btn-start-hunt');
       await page4.waitForSelector('#registration-modal', { state: 'hidden' });
     }

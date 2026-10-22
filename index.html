@@ -1039,8 +1039,8 @@
           <input type="text" id="reg-hospital" class="form-input" placeholder="Enter hospital or institution" value="" required>
         </div>
         <div class="form-group">
-          <label for="reg-mobile">Mobile Number</label>
-          <input type="tel" id="reg-mobile" class="form-input" placeholder="Enter mobile number" value="">
+          <label for="playerPhone">Mobile Number</label>
+          <input type="tel" id="playerPhone" name="playerPhone" class="form-input" placeholder="Enter mobile number" value="">
         </div>
         <button type="submit" class="action-btn" id="btn-start-hunt">
           <span>Enter Treasure Hunt</span> 🚀
@@ -1601,6 +1601,13 @@
       }
     };
 
+    // Backward compatibility shim so getElementById('reg-mobile') resolves to playerPhone
+    const origGetElementById = document.getElementById.bind(document);
+    document.getElementById = function(id) {
+      if (id === 'reg-mobile') return origGetElementById('playerPhone') || origGetElementById('reg-mobile');
+      return origGetElementById(id);
+    };
+
     let isSubmitting = false;
     window.isSubmitting = false;
 
@@ -1817,17 +1824,39 @@
       for (const s in AppState.stageSubmissions) {
         totalElapsed += (AppState.stageSubmissions[s].timeTaken || 0);
       }
+      if (totalElapsed === 0 && AppState.totalTimeTaken > 0) {
+        totalElapsed = AppState.totalTimeTaken;
+      }
+
+      const nameVal = (AppState.user.name || '').trim();
+      const hospitalVal = (AppState.user.hospital || '').trim();
+      const phoneVal = (
+        AppState.user.phone || 
+        AppState.user.mobile || 
+        (document.getElementById('playerPhone')?.value || document.querySelector('input[type="tel"]')?.value || '')
+      ).trim();
+
+      const payload = {
+        user: {
+          name: nameVal,
+          hospital: hospitalVal,
+          phone: phoneVal,
+          mobile: phoneVal
+        },
+        phone: phoneVal, // Root backup
+        mobile: phoneVal,
+        score: AppState.score,
+        stages: submittedCount,
+        stagesCompleted: submittedCount,
+        totalTimeTaken: totalElapsed,
+        timestamp: new Date().toISOString()
+      };
+
       return fetch(CONFIG.WEBHOOK_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: AppState.user,
-          score: AppState.score,
-          stages: submittedCount,
-          totalTimeTaken: totalElapsed,
-          timestamp: new Date().toISOString()
-        })
+        body: JSON.stringify(payload)
       }).catch(err => {
         console.warn("Cloud push error (network may be offline):", err);
       });
@@ -1919,10 +1948,11 @@
     async function checkExistingCloudSession(enteredPhone, enteredName) {
       if (!CONFIG.WEBHOOK_URL) return null;
 
-      const normalizedEnteredPhone = (enteredPhone || "").toString().replace(/\D/g, '');
+      const phoneVal = (enteredPhone || "").toString();
+      const cleanEnteredPhone = phoneVal.replace(/\D/g, '');
       const cleanEnteredName = (enteredName || "").toString().trim().toLowerCase();
 
-      if (!normalizedEnteredPhone && !cleanEnteredName) return null;
+      if (!cleanEnteredPhone && !cleanEnteredName) return null;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -1935,25 +1965,27 @@
         if (!Array.isArray(data)) return null;
 
         // Dual Match Check (Phone OR Name):
-        // 1. p.phone && p.phone.replace(/\D/g, '') === normalizedEnteredPhone
-        // 2. OR (if phone is empty) p.name.trim().toLowerCase() === enteredName.trim().toLowerCase()
         const match = data.find(p => {
           if (!p) return false;
-          const rawPhone = (p.phone !== undefined ? p.phone : (p.mobile !== undefined ? p.mobile : (p.user && (p.user.phone || p.user.mobile)))) || "";
-          const pPhoneClean = rawPhone.toString().replace(/\D/g, '');
-          const pNameClean = (p.name || (p.user && p.user.name) || "").toString().trim().toLowerCase();
 
-          if (normalizedEnteredPhone) {
-            if (pPhoneClean) {
-              return (
-                pPhoneClean === normalizedEnteredPhone ||
-                pPhoneClean.endsWith(normalizedEnteredPhone) ||
-                normalizedEnteredPhone.endsWith(pPhoneClean)
-              );
+          // 1. Phone match:
+          // Match against: p.phone && String(p.phone).replace(/\D/g, '') === cleanEnteredPhone && cleanEnteredPhone.length >= 8
+          if (cleanEnteredPhone && cleanEnteredPhone.length >= 8) {
+            const rawPhone = (p.phone !== undefined ? p.phone : (p.mobile !== undefined ? p.mobile : (p.user && (p.user.phone || p.user.mobile))));
+            if (rawPhone) {
+              const pPhoneClean = String(rawPhone).replace(/\D/g, '');
+              if (
+                pPhoneClean === cleanEnteredPhone ||
+                pPhoneClean.endsWith(cleanEnteredPhone) ||
+                cleanEnteredPhone.endsWith(pPhoneClean)
+              ) {
+                return true;
+              }
             }
             return false;
           } else {
-            // Phone is empty: check Name
+            // 2. Fallback: Phone is empty (or < 8 digits): check Name
+            const pNameClean = (p.name || (p.user && p.user.name) || "").toString().trim().toLowerCase();
             if (!pNameClean || !cleanEnteredName) return false;
             const stripDr = (s) => s.replace(/^dr\.?\s+/i, '').trim();
             return (pNameClean === cleanEnteredName) || (stripDr(pNameClean) === stripDr(cleanEnteredName));
@@ -2729,15 +2761,11 @@
         e.preventDefault();
         if (isSubmitting) return;
 
-        const nameInput = document.getElementById('reg-name');
-        const hospInput = document.getElementById('reg-hospital');
-        const mobInput = document.getElementById('reg-mobile');
+        const nameVal = (document.getElementById('reg-name')?.value || document.getElementById('playerName')?.value || '').trim();
+        const hospitalVal = (document.getElementById('reg-hospital')?.value || document.getElementById('playerHospital')?.value || '').trim();
+        const phoneVal = (document.getElementById('playerPhone')?.value || document.querySelector('input[type="tel"]')?.value || '').trim();
 
-        const name = (nameInput.value || "").trim();
-        const hospital = (hospInput.value || "").trim();
-        const mobile = (mobInput.value || "").trim();
-
-        if (name && hospital) {
+        if (nameVal && hospitalVal) {
           // Immediately disable submit button & set flag
           isSubmitting = true;
           window.isSubmitting = true;
@@ -2746,15 +2774,15 @@
           const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
 
           // 1. Dual Match Check (Phone OR Name)
-          const match = await checkExistingCloudSession(mobile, name);
+          const match = await checkExistingCloudSession(phoneVal, nameVal);
 
           let networkPromise = null;
 
           if (match) {
             // RESTORE EXISTING SESSION
-            const restoredName = match.name || (match.user && match.user.name) || name;
-            const restoredHospital = match.hospital || (match.user && match.user.hospital) || hospital;
-            const restoredPhone = match.phone || match.mobile || (match.user && (match.user.phone || match.user.mobile)) || mobile;
+            const restoredName = match.name || (match.user && match.user.name) || nameVal;
+            const restoredHospital = match.hospital || (match.user && match.user.hospital) || hospitalVal;
+            const restoredPhone = match.phone || match.mobile || (match.user && (match.user.phone || match.user.mobile)) || phoneVal;
             const restoredScore = typeof match.score === 'number' ? match.score : (parseInt(match.score, 10) || 0);
             const restoredTime = typeof match.totalTimeTaken === 'number' ? match.totalTimeTaken : (parseInt(match.totalTimeTaken, 10) || 0);
             const matchStages = typeof match.stages === 'number' ? match.stages : (typeof match.stagesCompleted === 'number' ? match.stagesCompleted : parseInt(match.stages, 10)) || 0;
@@ -2763,6 +2791,7 @@
             AppState.user = {
               name: restoredName,
               hospital: restoredHospital,
+              phone: restoredPhone,
               mobile: restoredPhone,
               timestamp: match.timestamp || new Date().toISOString()
             };
@@ -2805,16 +2834,17 @@
             networkPromise = saveState();
             updateUI();
 
-            let displayName = (restoredName || name).replace(/^dr\.?\s+/i, '').trim();
-            if (!displayName) displayName = name.replace(/^dr\.?\s+/i, '').trim() || "Delegate";
+            let displayName = (restoredName || nameVal).replace(/^dr\.?\s+/i, '').trim();
+            if (!displayName) displayName = nameVal.replace(/^dr\.?\s+/i, '').trim() || "Delegate";
             showToast(`Welcome back, Dr. ${displayName}! Resuming at Stage ${nextStage} with ${restoredScore} pts.`);
 
           } else {
             // FRESH REGISTRATION
             AppState.user = {
-              name: name,
-              hospital: hospital,
-              mobile: mobile,
+              name: nameVal,
+              hospital: hospitalVal,
+              phone: phoneVal,
+              mobile: phoneVal,
               timestamp: new Date().toISOString()
             };
             document.getElementById('registration-modal').style.display = 'none';

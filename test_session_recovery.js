@@ -76,7 +76,7 @@ async function runSessionRecoveryTests() {
     console.log("  Entering registration form with phone '9845011223'...");
     await page1.fill('#reg-name', 'Dr. Sandeep Shenoy');
     await page1.fill('#reg-hospital', 'Manipal Hospital');
-    await page1.fill('#reg-mobile', '9845011223');
+    await page1.fill('#playerPhone', '9845011223');
 
     await page1.click('#btn-start-hunt');
     await page1.waitForTimeout(600);
@@ -178,7 +178,7 @@ async function runSessionRecoveryTests() {
     console.log("  Entering registration form with name 'Dr. Anita Desai' and EMPTY phone...");
     await page2.fill('#reg-name', 'Dr. Anita Desai');
     await page2.fill('#reg-hospital', 'Apollo Hospitals');
-    await page2.fill('#reg-mobile', ''); // Strictly empty phone
+    await page2.fill('#playerPhone', ''); // Strictly empty phone
 
     await page2.click('#btn-start-hunt');
     await page2.waitForTimeout(600);
@@ -280,7 +280,7 @@ async function runSessionRecoveryTests() {
     const tStart = Date.now();
     await page3.fill('#reg-name', 'Dr. Failsafe Tester');
     await page3.fill('#reg-hospital', 'Emergency Hospital');
-    await page3.fill('#reg-mobile', '9111122222');
+    await page3.fill('#playerPhone', '9111122222');
 
     await page3.click('#btn-start-hunt');
 

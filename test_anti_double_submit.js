@@ -46,7 +46,7 @@ async function runAntiDoubleSubmitTests() {
 
     await page.fill('#reg-name', 'Dr. Anti Double Tap');
     await page.fill('#reg-hospital', 'Manipal Institute');
-    await page.fill('#reg-mobile', '9845099999');
+    await page.fill('#playerPhone', '9845099999');
 
     postRequests = [];
 
@@ -81,7 +81,13 @@ async function runAntiDoubleSubmitTests() {
     console.log(`  window.isSubmitting reset after lock window: ${isSubmittingReset}`);
     console.log(`  POST requests dispatched during registration: ${postRequests.length} (Expected: 1)`);
 
-    const test1Pass = regResult.disabledAfterClick1 && regResult.isSubmittingAfterClick1 && isSubmittingReset && (postRequests.length === 1);
+    // Verify phone payload consistency
+    const regPayload = postRequests[0]?.postData ? JSON.parse(postRequests[0].postData) : null;
+    const phoneInUser = regPayload?.user?.phone === '9845099999';
+    const phoneAtRoot = regPayload?.phone === '9845099999';
+    console.log(`  Payload consistency: user.phone='${regPayload?.user?.phone}', root phone='${regPayload?.phone}' (Both valid: ${phoneInUser && phoneAtRoot})`);
+
+    const test1Pass = regResult.disabledAfterClick1 && regResult.isSubmittingAfterClick1 && isSubmittingReset && (postRequests.length === 1) && phoneInUser && phoneAtRoot;
 
     // ------------------------------------------------------------
     // TEST 2: STAGE 1 SUBMIT ANSWER ANTI-DOUBLE-SUBMISSION

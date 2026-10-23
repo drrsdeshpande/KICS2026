@@ -1017,7 +1017,6 @@
     <div class="header-actions">
       <div id="user-score-badge" class="score-badge">⭐️ <span id="header-score">0</span> pts</div>
       <button id="btn-audio-toggle" class="icon-btn" title="Toggle Sound" aria-label="Toggle Sound">🔊</button>
-      <button id="btn-view-toggle" class="icon-btn" title="View Stage Leaderboard" aria-label="View Leaderboard">🏆</button>
     </div>
   </header>
 
@@ -1483,9 +1482,6 @@
               <div style="font-size: 32px; margin-bottom: 8px;">🏆</div>
               <h3 style="font-size: 20px; font-weight: 800; color: #fff;">Treasure Hunt Completed!</h3>
               <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">Your final score has been transmitted to the Auditorium Projector Screen.</p>
-              <button class="action-btn" id="btn-view-stage-board" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                <span>View Stage Leaderboard</span> 🏆
-              </button>
             </div>
           </div>
         </div>
@@ -1531,10 +1527,6 @@
         <button id="btn-export-csv" class="hud-btn" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5);">
           <span>📥</span>
           <span>Export CSV</span>
-        </button>
-        <button id="btn-reset-leaderboard" class="hud-btn" title="Presenter shortcut: Shift + X" style="background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.4); color: #f43f5e;">
-          <span>🗑️</span>
-          <span>Reset Leaderboard</span>
         </button>
       </div>
     </div>
@@ -2158,6 +2150,11 @@
         data = window.lastLeaderboardData || [];
       }
 
+      // Leaderboard strictly renders ONLY when URL path is /#leaderboard
+      if (window.location.hash !== '#leaderboard') {
+        return;
+      }
+
       // Strictly normalize and render cloud data (no local AppState.user injection)
       const records = data.map(normalizeParticipant).filter(Boolean);
 
@@ -2646,20 +2643,22 @@
       const btnViewToggle = document.getElementById('btn-view-toggle');
 
       if (viewName === 'leaderboard') {
-        delegateView.style.display = 'none';
-        leaderboardView.style.display = 'block';
-        btnViewToggle.classList.add('active');
-        document.getElementById('registration-modal').style.display = 'none';
+        if (delegateView) delegateView.style.display = 'none';
+        if (leaderboardView) leaderboardView.style.display = 'block';
+        if (btnViewToggle) btnViewToggle.classList.add('active');
+        const regModal = document.getElementById('registration-modal');
+        if (regModal) regModal.style.display = 'none';
         renderLeaderboardView();
         startAutoScroll();
         startLeaderboardPolling();
       } else {
-        delegateView.style.display = 'block';
-        leaderboardView.style.display = 'none';
-        btnViewToggle.classList.remove('active');
+        if (delegateView) delegateView.style.display = 'block';
+        if (leaderboardView) leaderboardView.style.display = 'none';
+        if (btnViewToggle) btnViewToggle.classList.remove('active');
         stopLeaderboardPolling();
         if (!AppState.user) {
-          document.getElementById('registration-modal').style.display = 'flex';
+          const regModal = document.getElementById('registration-modal');
+          if (regModal) regModal.style.display = 'flex';
         }
         if (AppState.scrollInterval) clearInterval(AppState.scrollInterval);
       }
@@ -2724,8 +2723,9 @@
       // Production roster initializes empty; zero mock delegates in production
       window.participants = participants;
 
-      if (!AppState.user) {
-        document.getElementById('registration-modal').style.display = 'flex';
+      if (!AppState.user && window.location.hash !== '#leaderboard') {
+        const regModal = document.getElementById('registration-modal');
+        if (regModal) regModal.style.display = 'flex';
       }
 
       ensureStageTimer(1);
@@ -2771,6 +2771,7 @@
 
       regForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        e.stopPropagation();
         if (isSubmitting) return;
 
         const phoneInput = document.getElementById('playerPhone') || document.querySelector('input[type="tel"]') || document.getElementById('reg-mobile');
@@ -2785,7 +2786,11 @@
           // Immediately disable submit button & set flag
           isSubmitting = true;
           window.isSubmitting = true;
-          if (regBtn) regBtn.disabled = true;
+          const originalBtnText = regBtn ? regBtn.textContent : "Enter Treasure Hunt 🚀";
+          if (regBtn) {
+            regBtn.disabled = true;
+            regBtn.textContent = "Checking records...";
+          }
 
           const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -2829,6 +2834,7 @@
             const remTime = N > 0 ? (existingTime % N) : 0;
 
             AppState.unlockedStages = [];
+            AppState.stageSubmissions = {};
             for (let s = 1; s <= N; s++) {
               AppState.unlockedStages.push(s);
               const stagePts = basePts + (s <= remPts ? 1 : 0);
@@ -2842,24 +2848,52 @@
               };
             }
 
-            // Set current active stage to match.stages + 1 (or show Day 2 locked screen if match.stages === 3)
-            const nextStage = existingStages + 1;
-            const targetStage = Math.min(5, Math.max(1, nextStage));
+            // Determine active target screen:
+            // * If stagesCompleted === 3: Show the Day 1 completed / Day 2 locked screen.
+            // * If stagesCompleted < 3: Show Stage (stagesCompleted + 1).
+            // * If stagesCompleted === 4: Show Stage 5.
+            // * If stagesCompleted === 5: Show the Final completed screen.
+            let targetStage;
+            if (existingStages === 3) {
+              targetStage = 4;
+            } else if (existingStages < 3) {
+              targetStage = existingStages + 1;
+            } else if (existingStages === 4) {
+              targetStage = 5;
+            } else { // 5 or higher
+              targetStage = 5;
+            }
+
             AppState.currentStage = targetStage;
-            if (AppState.unlockedStages.includes(targetStage)) {
+            if (AppState.unlockedStages.includes(targetStage) && !AppState.stageSubmissions[targetStage]?.submitted) {
               ensureStageTimer(targetStage);
             }
 
-            document.getElementById('registration-modal').style.display = 'none';
+            // Immediately hide registration modal
+            const regModal = document.getElementById('registration-modal');
+            if (regModal) {
+              regModal.style.display = 'none';
+              regModal.classList.add('hidden');
+            }
+
+            // Unhide and show delegate view
+            const delegateView = document.getElementById('delegate-view');
+            if (delegateView) {
+              delegateView.style.display = 'block';
+              delegateView.classList.remove('hidden');
+            }
+
             SoundFX.successChord();
 
-            // Save AppState to localStorage (without sending POST to cloud)
+            // Save AppState to localStorage with exact schema used on normal boot (without sending POST to cloud)
             saveState(true);
+
+            // Render the appropriate active screen
             updateUI();
 
             let displayName = existingName.replace(/^dr\.?\s+/i, '').trim();
             if (!displayName) displayName = nameVal.replace(/^dr\.?\s+/i, '').trim() || "Delegate";
-            showToast("Welcome back, Dr. " + displayName + "! Progress restored: " + existingStages + "/5 stages completed.");
+            showToast("Welcome back, Dr. " + displayName + "! Resuming your progress.");
 
           } else {
             // CASE B: New User
@@ -2880,7 +2914,18 @@
             }
             AppState.currentStage = AppState.currentStage || 1;
 
-            document.getElementById('registration-modal').style.display = 'none';
+            const regModal = document.getElementById('registration-modal');
+            if (regModal) {
+              regModal.style.display = 'none';
+              regModal.classList.add('hidden');
+            }
+
+            const delegateView = document.getElementById('delegate-view');
+            if (delegateView) {
+              delegateView.style.display = 'block';
+              delegateView.classList.remove('hidden');
+            }
+
             ensureStageTimer(AppState.currentStage);
             SoundFX.successChord();
 
@@ -2892,7 +2937,10 @@
           await Promise.race([networkPromise, minDelayPromise]);
           isSubmitting = false;
           window.isSubmitting = false;
-          if (regBtn) regBtn.disabled = false;
+          if (regBtn) {
+            regBtn.disabled = false;
+            regBtn.textContent = originalBtnText;
+          }
         }
       });
 
@@ -3078,34 +3126,57 @@
         });
       }
 
-      // Stage 5 View Leaderboard Button
-      document.getElementById('btn-view-stage-board').addEventListener('click', () => {
-        window.location.hash = '#leaderboard';
-      });
+      // Stage 5 View Leaderboard Button (guarded)
+      const btnViewStageBoard = document.getElementById('btn-view-stage-board');
+      if (btnViewStageBoard) {
+        btnViewStageBoard.addEventListener('click', () => {
+          window.location.hash = '#leaderboard';
+        });
+      }
 
       // Presenter HUD Controls
-      document.getElementById('btn-freeze-toggle').addEventListener('click', toggleFreeze);
-      document.getElementById('btn-confetti').addEventListener('click', launchConfetti);
-      document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
-      document.getElementById('btn-reset-leaderboard').addEventListener('click', openResetModal);
-      document.getElementById('btn-reset-cancel').addEventListener('click', closeResetModal);
-      document.getElementById('btn-reset-confirm').addEventListener('click', clearLeaderboardData);
-      document.getElementById('reset-confirm-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'reset-confirm-modal') closeResetModal();
-      });
-      document.getElementById('btn-back-to-hunt').addEventListener('click', () => {
-        window.location.hash = '#hunt';
-      });
+      const btnFreezeToggle = document.getElementById('btn-freeze-toggle');
+      if (btnFreezeToggle) btnFreezeToggle.addEventListener('click', toggleFreeze);
+      const btnConfetti = document.getElementById('btn-confetti');
+      if (btnConfetti) btnConfetti.addEventListener('click', launchConfetti);
+      const btnExportCsv = document.getElementById('btn-export-csv');
+      if (btnExportCsv) btnExportCsv.addEventListener('click', exportCSV);
+      const btnResetLeaderboard = document.getElementById('btn-reset-leaderboard');
+      if (btnResetLeaderboard) {
+        btnResetLeaderboard.addEventListener('click', openResetModal);
+      }
+      const btnResetCancel = document.getElementById('btn-reset-cancel');
+      if (btnResetCancel) btnResetCancel.addEventListener('click', closeResetModal);
+      const btnResetConfirm = document.getElementById('btn-reset-confirm');
+      if (btnResetConfirm) btnResetConfirm.addEventListener('click', clearLeaderboardData);
+      const resetConfirmModal = document.getElementById('reset-confirm-modal');
+      if (resetConfirmModal) {
+        resetConfirmModal.addEventListener('click', (e) => {
+          if (e.target.id === 'reset-confirm-modal') closeResetModal();
+        });
+      }
+      const btnBackToHunt = document.getElementById('btn-back-to-hunt');
+      if (btnBackToHunt) {
+        btnBackToHunt.addEventListener('click', () => {
+          window.location.hash = '#hunt';
+        });
+      }
 
-      // Header icon toggles
-      document.getElementById('btn-view-toggle').addEventListener('click', () => {
-        window.location.hash = (window.location.hash === '#leaderboard') ? '#hunt' : '#leaderboard';
-      });
+      // Header icon toggles (guarded)
+      const btnViewToggle = document.getElementById('btn-view-toggle');
+      if (btnViewToggle) {
+        btnViewToggle.addEventListener('click', () => {
+          window.location.hash = (window.location.hash === '#leaderboard') ? '#hunt' : '#leaderboard';
+        });
+      }
 
-      document.getElementById('btn-audio-toggle').addEventListener('click', () => {
-        AppState.soundMuted = !AppState.soundMuted;
-        document.getElementById('btn-audio-toggle').textContent = AppState.soundMuted ? '🔇' : '🔊';
-      });
+      const btnAudioToggle = document.getElementById('btn-audio-toggle');
+      if (btnAudioToggle) {
+        btnAudioToggle.addEventListener('click', () => {
+          AppState.soundMuted = !AppState.soundMuted;
+          btnAudioToggle.textContent = AppState.soundMuted ? '🔇' : '🔊';
+        });
+      }
 
       // BroadcastChannel receiver
       syncChannel.onmessage = (event) => {

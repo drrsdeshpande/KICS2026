@@ -13,7 +13,7 @@
  *        * Do NOT send a POST request.
  *        * Hydrate AppState (user, score, stagesCompleted, totalTimeTaken).
  *        * Save AppState to localStorage.
- *        * Display message: "Welcome back, Dr. " + existing.name + "! Progress restored: " + existing.stages + "/5 stages completed."
+ *        * Display message: "Welcome back, Dr. " + existing.name + "! Resuming your progress."
  *        * If existing.stages === 3, show the Day 2 locked screen; otherwise advance to existing.stages + 1.
  *    - Case B: New User:
  *        * Initialize normal state (score: 0, stages: 0).
@@ -124,7 +124,7 @@ async function runSessionRecoveryTests() {
       return (t ? t.textContent : "") || (p ? p.textContent : "");
     });
     console.log(`  Recovery Toast Text: '${toast1Text}'`);
-    const toast1Matches = toast1Text.includes("Welcome back, Dr. Sandeep Shenoy! Progress restored: 2/5 stages completed.");
+    const toast1Matches = toast1Text.includes("Welcome back, Dr. Sandeep Shenoy! Resuming your progress.");
 
     const localSaved1 = await page1.evaluate(() => {
       const raw = localStorage.getItem("kics_app_state");
@@ -244,7 +244,7 @@ async function runSessionRecoveryTests() {
       return (t ? t.textContent : "") || (p ? p.textContent : "");
     });
     console.log(`  Recovery Toast Text: '${toast2Text}'`);
-    const toast2Matches = toast2Text.includes("Welcome back, Dr. Anita Desai! Progress restored: 3/5 stages completed.");
+    const toast2Matches = toast2Text.includes("Welcome back, Dr. Anita Desai! Resuming your progress.");
 
     const localSaved2 = await page2.evaluate(() => {
       const raw = localStorage.getItem("kics_app_state");

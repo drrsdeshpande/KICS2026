@@ -1854,10 +1854,15 @@
 
       const nameVal = (AppState.user.name || '').trim();
       const hospitalVal = (AppState.user.hospital || '').trim();
+      const phoneEl = document.querySelector('input[type="tel"]') || 
+                      document.getElementById('phone') || 
+                      document.getElementById('playerPhone') || 
+                      document.getElementById('mobile');
+      const fallbackPhone = phoneEl ? phoneEl.value.replace(/\D/g, '') : '';
       const phoneVal = (
-        AppState.user.phone || 
-        AppState.user.mobile || 
-        (document.getElementById('playerPhone')?.value || document.querySelector('input[type="tel"]')?.value || '')
+        (AppState.user && (AppState.user.phone || AppState.user.mobile)) || 
+        fallbackPhone || 
+        ''
       ).trim();
 
       const payload = {
@@ -2127,6 +2132,14 @@
         AppState.score = 0;
         AppState.stageSubmissions = {};
         saveState();
+      }
+      if (CONFIG.WEBHOOK_URL) {
+        fetch(CONFIG.WEBHOOK_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "reset" })
+        }).catch(err => console.warn("Cloud reset error:", err));
       }
       closeResetModal();
       renderLeaderboard([]);
@@ -2605,19 +2618,21 @@
 
       if (entered === expected) {
         SoundFX.padlockClick();
-        errBox.textContent = "";
-        input.classList.remove('error');
+        if (errBox) errBox.textContent = "";
+        if (input) input.classList.remove('error');
         if (!AppState.unlockedStages.includes(stageNum)) {
           AppState.unlockedStages.push(stageNum);
         }
+        AppState.currentStage = stageNum;
+        AppState.currentStageIndex = stageNum - 1;
         ensureStageTimer(stageNum);
         saveState();
         updateUI();
       } else {
         SoundFX.errorBuzz();
-        input.classList.add('error');
-        errBox.textContent = "Invalid passcode. Please check announcement during Break.";
-        setTimeout(() => input.classList.remove('error'), 500);
+        if (input) input.classList.add('error');
+        if (errBox) errBox.textContent = "Invalid passcode. Please check announcement during Break.";
+        setTimeout(() => { if (input) input.classList.remove('error'); }, 500);
       }
     }
 
@@ -2825,8 +2840,13 @@
         e.stopPropagation();
         if (isSubmitting) return;
 
-        const phoneInput = document.getElementById('playerPhone') || document.querySelector('input[type="tel"]') || document.getElementById('reg-mobile');
-        const cleanPhone = (phoneInput?.value || '').replace(/\D/g, '');
+        const phoneEl = document.querySelector('input[type="tel"]') || 
+                        document.getElementById('phone') || 
+                        document.getElementById('playerPhone') || 
+                        document.getElementById('mobile');
+        const enteredPhone = phoneEl ? phoneEl.value.replace(/\D/g, '') : '';
+        const cleanEnteredPhone = normalizePhone(enteredPhone);
+        const cleanPhone = cleanEnteredPhone;
 
         const nameInput = document.getElementById('reg-name') || document.getElementById('playerName');
         const hospInput = document.getElementById('reg-hospital') || document.getElementById('playerHospital');
@@ -2864,8 +2884,8 @@
             AppState.user = {
               name: existingName,
               hospital: existingHospital,
-              phone: cleanPhone || phoneInput?.value || '',
-              mobile: cleanPhone || phoneInput?.value || ''
+              phone: enteredPhone || existing.mobile || existing.phone || '',
+              mobile: enteredPhone || existing.mobile || existing.phone || ''
             };
             AppState.score = Number(existing.score) || 0;
             AppState.stagesCompleted = Number(matchStages);
@@ -2980,8 +3000,8 @@
             AppState.user = {
               name: nameVal,
               hospital: hospitalVal,
-              phone: cleanPhone || phoneInput?.value || '',
-              mobile: cleanPhone || phoneInput?.value || '',
+              phone: enteredPhone,
+              mobile: enteredPhone,
               timestamp: new Date().toISOString()
             };
             AppState.score = 0;
@@ -3212,6 +3232,19 @@
           }
         });
       }
+
+      // Enter key support on in-card passcode fields
+      [2, 3, 4, 5].forEach(s => {
+        const inp = document.getElementById(`passcode-${s}`);
+        if (inp) {
+          inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              checkPasscode(s);
+            }
+          });
+        }
+      });
 
       // Stage 5 View Leaderboard Button (guarded)
       const btnViewStageBoard = document.getElementById('btn-view-stage-board');

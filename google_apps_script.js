@@ -100,10 +100,22 @@ function doPost(e) {
       body = e.parameter;
     }
 
+    if (body.action === "reset" || body.action === "clear") {
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
+      }
+      SpreadsheetApp.flush();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Leaderboard cleared successfully"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     const user = body.user || {};
     const name = String(user.name || body.name || "Delegate").trim();
     const hospital = String(user.hospital || body.hospital || "Institution").trim();
-    const mobile = String(user.mobile || body.mobile || "").trim();
+    const mobile = String(user.mobile || user.phone || body.mobile || body.phone || "").trim();
     const score = Number(body.score !== undefined ? body.score : 0);
     const stages = Number(body.stages !== undefined ? body.stages : (body.stagesCompleted || 0));
     const totalTimeTaken = Number(body.totalTimeTaken !== undefined ? body.totalTimeTaken : 0);

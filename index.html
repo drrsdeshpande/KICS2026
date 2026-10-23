@@ -1528,6 +1528,10 @@
           <span>📥</span>
           <span>Export CSV</span>
         </button>
+        <button id="btn-reset-leaderboard" class="hud-btn" title="Presenter shortcut: Shift + X" style="background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.4); color: #f43f5e;">
+          <span>🗑️</span>
+          <span>Reset Leaderboard</span>
+        </button>
       </div>
     </div>
 
@@ -1606,12 +1610,20 @@
     let AppState = {
       user: null,
       currentStage: 1,
+      currentStageIndex: 0,
       unlockedStages: [1],
       score: 0,
       stagesCompleted: 0,
       totalTimeTaken: 0,
       stageStartTimes: {},   // { 1: timestamp, 2: timestamp, ... }
       stageSubmissions: {},  // { 1: { submitted: true, score: 980, timeTaken: 2, answer: "...", correct: true } }
+      stages: [
+        { id: 1, name: "Waterfall", completed: false, unlocked: true },
+        { id: 2, name: "Pittsburgh", completed: false, unlocked: false },
+        { id: 3, name: "Bengaluru", completed: false, unlocked: false },
+        { id: 4, name: "Picture Puzzle", completed: false, unlocked: false },
+        { id: 5, name: "Clinical Rebus", completed: false, unlocked: false }
+      ],
       soundMuted: false,
       isFrozen: false,
       scrollInterval: null,
@@ -1723,10 +1735,10 @@
       return Math.max(200, 1000 - (elapsedSeconds * 10));
     }
 
-    function ensureStageTimer(stageNum) {
+    function ensureStageTimer(stageNum, skipCloudPush = false) {
       if (!AppState.stageStartTimes[stageNum]) {
         AppState.stageStartTimes[stageNum] = Date.now();
-        saveState();
+        saveState(skipCloudPush);
       }
     }
 
@@ -1741,6 +1753,10 @@
           const parsed = JSON.parse(storedHunt);
           AppState.unlockedStages = parsed.unlockedStages || [1];
           AppState.currentStage = parsed.currentStage || 1;
+          AppState.currentStageIndex = (typeof parsed.currentStageIndex === 'number') ? parsed.currentStageIndex : (AppState.currentStage - 1);
+          if (Array.isArray(parsed.stages)) {
+            AppState.stages = parsed.stages;
+          }
           AppState.stageStartTimes = parsed.stageStartTimes || {};
           AppState.stageSubmissions = parsed.stageSubmissions || {};
 
@@ -1775,6 +1791,8 @@
         localStorage.setItem("kics_hunt_state", JSON.stringify({
           unlockedStages: AppState.unlockedStages,
           currentStage: AppState.currentStage,
+          currentStageIndex: (typeof AppState.currentStageIndex === 'number') ? AppState.currentStageIndex : (AppState.currentStage - 1),
+          stages: AppState.stages,
           score: AppState.score,
           stagesCompleted: AppState.stagesCompleted || Object.keys(AppState.stageSubmissions).length,
           totalTimeTaken: AppState.totalTimeTaken,
@@ -1785,6 +1803,8 @@
           user: AppState.user,
           unlockedStages: AppState.unlockedStages,
           currentStage: AppState.currentStage,
+          currentStageIndex: (typeof AppState.currentStageIndex === 'number') ? AppState.currentStageIndex : (AppState.currentStage - 1),
+          stages: AppState.stages,
           score: AppState.score,
           stagesCompleted: AppState.stagesCompleted || Object.keys(AppState.stageSubmissions).length,
           totalTimeTaken: AppState.totalTimeTaken,
@@ -2385,8 +2405,38 @@
     /* ========================================================
        7. STAGE GATING & SINGLE-ATTEMPT EVALUATION
        ======================================================== */
+    function showCurrentStage() {
+      updateUI();
+    }
+
+    function renderStage(stageIndexOrNum) {
+      if (typeof stageIndexOrNum === 'number') {
+        const stageNum = (stageIndexOrNum >= 0 && stageIndexOrNum < 5) ? (stageIndexOrNum + 1) : stageIndexOrNum;
+        AppState.currentStage = stageNum;
+        AppState.currentStageIndex = stageNum - 1;
+        if (AppState.unlockedStages.includes(stageNum) && !AppState.stageSubmissions[stageNum]?.submitted) {
+          ensureStageTimer(stageNum, true);
+        }
+      }
+      updateUI();
+    }
+
+    window.renderStage = renderStage;
+    window.showCurrentStage = showCurrentStage;
+    window.updateUI = updateUI;
+
     function updateUI() {
       document.getElementById('header-score').textContent = AppState.score;
+      AppState.currentStageIndex = (typeof AppState.currentStage === 'number') ? (AppState.currentStage - 1) : 0;
+
+      if (Array.isArray(AppState.stages)) {
+        AppState.stages.forEach((st, idx) => {
+          const s = idx + 1;
+          const sub = AppState.stageSubmissions[s];
+          st.completed = !!(sub && sub.submitted);
+          st.unlocked = AppState.unlockedStages.includes(s);
+        });
+      }
 
       for (let s = 1; s <= 5; s++) {
         const stepBtn = document.getElementById(`step-nav-${s}`);
@@ -2770,6 +2820,7 @@
       const regBtn = document.getElementById('btn-start-hunt');
 
       regForm.addEventListener('submit', async (e) => {
+        // 1. Prevent Form Default & Show Progress
         e.preventDefault();
         e.stopPropagation();
         if (isSubmitting) return;
@@ -2789,15 +2840,15 @@
           const originalBtnText = regBtn ? regBtn.textContent : "Enter Treasure Hunt 🚀";
           if (regBtn) {
             regBtn.disabled = true;
-            regBtn.textContent = "Checking records...";
+            regBtn.textContent = "Restoring your session...";
           }
 
           const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
 
-          // 2. Check Cloud First (GET Request)
+          // 2. Fetch and Match
           const existing = await checkExistingCloudSession(cleanPhone, nameVal);
 
-          const existingStages = existing ? (
+          const matchStages = existing ? (
             typeof existing.stages === 'number' ? existing.stages : (
               typeof existing.stagesCompleted === 'number' ? existing.stagesCompleted : (parseInt(existing.stages, 10) || 0)
             )
@@ -2805,71 +2856,93 @@
 
           let networkPromise = null;
 
-          // 3. Branch Logic
-          if (existing && existingStages > 0) {
-            // CASE A: Existing User Found (existing && existing.stages > 0)
-            // Do NOT send a POST request!
+          // 3. Deep State Re-hydration
+          if (existing && matchStages > 0) {
             const existingName = existing.name || (existing.user && existing.user.name) || nameVal;
             const existingHospital = existing.hospital || (existing.user && existing.user.hospital) || hospitalVal;
-            const existingScore = typeof existing.score === 'number' ? existing.score : (parseInt(existing.score, 10) || 0);
-            const existingTime = typeof existing.totalTimeTaken === 'number' ? existing.totalTimeTaken : (parseInt(existing.totalTimeTaken, 10) || 0);
 
-            // Hydrate AppState
             AppState.user = {
               name: existingName,
               hospital: existingHospital,
               phone: cleanPhone || phoneInput?.value || '',
               mobile: cleanPhone || phoneInput?.value || ''
             };
-            AppState.score = existingScore;
-            AppState.stagesCompleted = existingStages;
-            AppState.totalTimeTaken = existingTime;
+            AppState.score = Number(existing.score) || 0;
+            AppState.stagesCompleted = Number(matchStages);
+            AppState.totalTimeTaken = Number(existing.totalTimeTaken) || 0;
 
-            // Mark stages 1 through N as completed and locked/solved
-            const N = Math.min(5, Math.max(0, existingStages));
+            // Update Stage Progression Flags:
+            const N = Math.min(5, Math.max(0, matchStages));
             const correctAnswers = { 1: 'opt-b', 2: 'opt-c', 3: 'opt-b', 4: 'opt-b', 5: 'kalaazar' };
-            const basePts = N > 0 ? Math.floor(existingScore / N) : 0;
-            const remPts = N > 0 ? (existingScore % N) : 0;
-            const baseTime = N > 0 ? Math.floor(existingTime / N) : 0;
-            const remTime = N > 0 ? (existingTime % N) : 0;
+            const basePts = N > 0 ? Math.floor(AppState.score / N) : 0;
+            const remPts = N > 0 ? (AppState.score % N) : 0;
+            const baseTime = N > 0 ? Math.floor(AppState.totalTimeTaken / N) : 0;
+            const remTime = N > 0 ? (AppState.totalTimeTaken % N) : 0;
 
             AppState.unlockedStages = [];
             AppState.stageSubmissions = {};
-            for (let s = 1; s <= N; s++) {
-              AppState.unlockedStages.push(s);
-              const stagePts = basePts + (s <= remPts ? 1 : 0);
-              const stageTime = baseTime + (s <= remTime ? 1 : 0);
-              AppState.stageSubmissions[s] = {
-                submitted: true,
-                score: stagePts,
-                answer: correctAnswers[s] || "Restored Answer",
-                correct: (stagePts > 0),
-                timeTaken: stageTime
-              };
+
+            // Iterate through the stages array
+            AppState.stages.forEach((st, idx) => {
+              const sNum = idx + 1;
+              if (idx < N) {
+                // For index 0 up to match.stages - 1: mark completed = true, unlocked = true, and store completed state
+                st.completed = true;
+                st.unlocked = true;
+                AppState.unlockedStages.push(sNum);
+
+                const stagePts = basePts + (sNum <= remPts ? 1 : 0);
+                const stageTime = baseTime + (sNum <= remTime ? 1 : 0);
+                AppState.stageSubmissions[sNum] = {
+                  submitted: true,
+                  score: stagePts,
+                  answer: correctAnswers[sNum] || "Restored Answer",
+                  correct: (stagePts > 0),
+                  timeTaken: stageTime
+                };
+              } else if (idx === N) {
+                // For index match.stages: mark unlocked = true, completed = false (except Day 2 locked when match.stages === 3)
+                if (N === 3) {
+                  st.unlocked = false;
+                  st.completed = false;
+                } else if (N < 5) {
+                  st.unlocked = true;
+                  st.completed = false;
+                  AppState.unlockedStages.push(sNum);
+                }
+              } else {
+                st.unlocked = false;
+                st.completed = false;
+              }
+            });
+
+            // Set Active Stage Pointer:
+            // Set current stage index to match.stages (e.g., if match.stages === 2, active stage must be index 2, which is Stage 3)
+            let activeIndex;
+            let activeStageNum;
+            if (matchStages === 3) {
+              activeIndex = 3;
+              activeStageNum = 4; // Stage 4 (Day 2 Locked)
+            } else if (matchStages >= 5) {
+              activeIndex = 4;
+              activeStageNum = 5; // Stage 5 (Completed)
+            } else {
+              activeIndex = matchStages;
+              activeStageNum = matchStages + 1;
             }
 
-            // Determine active target screen:
-            // * If stagesCompleted === 3: Show the Day 1 completed / Day 2 locked screen.
-            // * If stagesCompleted < 3: Show Stage (stagesCompleted + 1).
-            // * If stagesCompleted === 4: Show Stage 5.
-            // * If stagesCompleted === 5: Show the Final completed screen.
-            let targetStage;
-            if (existingStages === 3) {
-              targetStage = 4;
-            } else if (existingStages < 3) {
-              targetStage = existingStages + 1;
-            } else if (existingStages === 4) {
-              targetStage = 5;
-            } else { // 5 or higher
-              targetStage = 5;
+            AppState.currentStageIndex = activeIndex;
+            AppState.currentStage = activeStageNum;
+
+            if (AppState.unlockedStages.includes(activeStageNum) && !AppState.stageSubmissions[activeStageNum]?.submitted) {
+              ensureStageTimer(activeStageNum, true);
             }
 
-            AppState.currentStage = targetStage;
-            if (AppState.unlockedStages.includes(targetStage) && !AppState.stageSubmissions[targetStage]?.submitted) {
-              ensureStageTimer(targetStage);
-            }
+            // Sync to localStorage
+            saveState(true);
 
-            // Immediately hide registration modal
+            // 4. Screen Transition (Bypass Stage 1):
+            // Hide the registration container (display: none or .hidden)
             const regModal = document.getElementById('registration-modal');
             if (regModal) {
               regModal.style.display = 'none';
@@ -2885,15 +2958,21 @@
 
             SoundFX.successChord();
 
-            // Save AppState to localStorage with exact schema used on normal boot (without sending POST to cloud)
-            saveState(true);
-
-            // Render the appropriate active screen
-            updateUI();
+            // Render active screen
+            if (matchStages === 3) {
+              // Display the "Day 1 Complete — Day 2 Locked" waiting screen
+              renderStage(3);
+            } else if (matchStages === 5) {
+              // Display the "Hunt Completed" celebration screen
+              renderStage(4);
+            } else {
+              // Immediately trigger the render function for the active stage
+              renderStage(AppState.currentStageIndex);
+            }
 
             let displayName = existingName.replace(/^dr\.?\s+/i, '').trim();
             if (!displayName) displayName = nameVal.replace(/^dr\.?\s+/i, '').trim() || "Delegate";
-            showToast("Welcome back, Dr. " + displayName + "! Resuming your progress.");
+            showToast(`Welcome back, Dr. ${displayName}! Resuming at Stage ${matchStages + 1}.`);
 
           } else {
             // CASE B: New User
@@ -2913,6 +2992,14 @@
               AppState.unlockedStages.push(1);
             }
             AppState.currentStage = AppState.currentStage || 1;
+            AppState.currentStageIndex = (typeof AppState.currentStage === 'number') ? (AppState.currentStage - 1) : 0;
+            if (Array.isArray(AppState.stages)) {
+              AppState.stages.forEach((st, idx) => {
+                const sNum = idx + 1;
+                st.completed = false;
+                st.unlocked = (sNum === 1 || AppState.unlockedStages.includes(sNum));
+              });
+            }
 
             const regModal = document.getElementById('registration-modal');
             if (regModal) {
@@ -3143,7 +3230,11 @@
       if (btnExportCsv) btnExportCsv.addEventListener('click', exportCSV);
       const btnResetLeaderboard = document.getElementById('btn-reset-leaderboard');
       if (btnResetLeaderboard) {
-        btnResetLeaderboard.addEventListener('click', openResetModal);
+        btnResetLeaderboard.addEventListener('click', () => {
+          if (confirm("Are you sure you want to clear all scores?")) {
+            clearLeaderboardData();
+          }
+        });
       }
       const btnResetCancel = document.getElementById('btn-reset-cancel');
       if (btnResetCancel) btnResetCancel.addEventListener('click', closeResetModal);

@@ -16,12 +16,14 @@ async function verifyMobileCleanView() {
 
   const hasHeaderViewToggle = await page.$('#btn-view-toggle');
   const hasStageBoardBtn = await page.$('#btn-view-stage-board');
-  const hasResetBtnInHunt = await page.$('#btn-reset-leaderboard');
+  const hasResetBtnInDelegateView = await page.$('#delegate-view #btn-reset-leaderboard');
+  const isResetBtnVisibleOnHunt = await page.isVisible('#btn-reset-leaderboard');
 
   console.log("Checking Mobile Delegate Screen Elements:");
   console.log(`  #btn-view-toggle in Header: ${hasHeaderViewToggle ? 'PRESENT ❌' : 'ABSENT (Clean) ✅'}`);
   console.log(`  #btn-view-stage-board in Stage 5: ${hasStageBoardBtn ? 'PRESENT ❌' : 'ABSENT (Clean) ✅'}`);
-  console.log(`  #btn-reset-leaderboard: ${hasResetBtnInHunt ? 'PRESENT ❌' : 'ABSENT (Clean) ✅'}`);
+  console.log(`  #btn-reset-leaderboard in delegate view: ${hasResetBtnInDelegateView ? 'PRESENT ❌' : 'ABSENT (Clean) ✅'}`);
+  console.log(`  #btn-reset-leaderboard visible on #hunt: ${isResetBtnVisibleOnHunt ? 'VISIBLE ❌' : 'HIDDEN ✅'}`);
 
   const delegateViewVisible = await page.isVisible('#delegate-view');
   const leaderboardViewHidden = !(await page.isVisible('#leaderboard-view'));
@@ -46,24 +48,37 @@ async function verifyMobileCleanView() {
   const hasConfettiInHud = await page.isVisible('#btn-confetti');
   const hasExportInHud = await page.isVisible('#btn-export-csv');
 
-  console.log(`  Reset Leaderboard button in HUD: ${hasResetInHud ? 'PRESENT ❌' : 'REMOVED ✅'}`);
+  console.log(`  Reset Leaderboard button in HUD (Presenter only): ${hasResetInHud ? 'RESTORED ✅' : 'MISSING ❌'}`);
   console.log(`  Freeze Board (F) button present: ${hasFreezeInHud ? 'YES ✅' : 'NO ❌'}`);
   console.log(`  Confetti (C) button present: ${hasConfettiInHud ? 'YES ✅' : 'NO ❌'}`);
   console.log(`  Export CSV button present: ${hasExportInHud ? 'YES ✅' : 'NO ❌'}`);
 
+  let confirmDialogMsg = "";
+  page.once('dialog', async dialog => {
+    confirmDialogMsg = dialog.message();
+    await dialog.dismiss();
+  });
+  await page.click('#btn-reset-leaderboard');
+  await page.waitForTimeout(200);
+
+  const confirmMsgMatches = confirmDialogMsg === "Are you sure you want to clear all scores?";
+  console.log(`  Reset Leaderboard clicked prompts confirm(): ${confirmMsgMatches ? 'YES ✅' : 'NO ❌'}`);
+
   const allPassed = (
     !hasHeaderViewToggle &&
     !hasStageBoardBtn &&
-    !hasResetBtnInHunt &&
+    !hasResetBtnInDelegateView &&
+    !isResetBtnVisibleOnHunt &&
     delegateViewVisible &&
     leaderboardViewHidden &&
     leaderboardViewVisible &&
     delegateViewHidden &&
     regModalHidden &&
-    !hasResetInHud &&
+    hasResetInHud &&
     hasFreezeInHud &&
     hasConfettiInHud &&
-    hasExportInHud
+    hasExportInHud &&
+    confirmMsgMatches
   );
 
   console.log("\n============================================================");

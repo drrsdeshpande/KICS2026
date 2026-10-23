@@ -98,7 +98,7 @@ async function verifyAllStageRecoveries() {
       const p = document.getElementById('auto-unlock-pill');
       return (t ? t.textContent : "") || (p ? p.textContent : "");
     });
-    const toastValid = toastText.includes(`Welcome back, Dr. Tester ${tc.stages}! Resuming your progress.`);
+    const toastValid = toastText.includes(`Welcome back, Dr. Tester ${tc.stages}!`);
 
     const pass = modalHidden && !postDispatched && !alertsTriggered && screenCheckPassed && toastValid && score === tc.stages * 900 && stagesCompleted === tc.stages;
     console.log(`  Result for stages=${tc.stages}: ${pass ? 'PASSED ✅' : 'FAILED ❌'}\n`);

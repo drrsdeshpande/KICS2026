@@ -391,29 +391,22 @@ async function runTests() {
     const rowsPreserved = await page6.locator(".ticker-row").count();
     console.log(`  Modal closed on cancel: ${resetModalHidden}, Rows preserved: ${rowsPreserved} (Expected: 100)`);
 
-    // Test discreet button click & confirm reset
-    console.log("  Step 7c: Triggering reset confirmation action...");
-    const btnResetExists = await page6.$("#btn-reset-leaderboard");
-    if (btnResetExists) {
-      await page6.click("#btn-reset-leaderboard");
-    } else {
-      await page6.keyboard.press("Shift+KeyX");
-    }
-    await page6.waitForTimeout(200);
-    const resetModalVisible2 = await page6.isVisible("#reset-confirm-modal");
-    console.log(`  Reset modal opened: ${resetModalVisible2}`);
-
-    console.log("  Step 7d: Confirming reset action...");
-    await page6.click("#btn-reset-confirm");
+    // Test button click & confirm reset
+    console.log("  Step 7c: Clicking 'Reset Leaderboard' button and accepting confirmation...");
+    page6.once('dialog', async dialog => {
+      console.log(`  Confirm dialog prompted: '${dialog.message()}'`);
+      await dialog.accept();
+    });
+    await page6.click("#btn-reset-leaderboard");
     await page6.waitForTimeout(300);
 
-    const resetModalClosedFinal = !(await page6.isVisible("#reset-confirm-modal"));
     const clearedRows = await page6.locator(".ticker-row").count();
     const clearedHudCount = (await page6.textContent("#hud-total-delegates") || "").trim();
     const emptyRosterShown = await page6.isVisible("#empty-roster");
     const storageCleared = await page6.evaluate(() => localStorage.getItem('participants') === null);
 
-    console.log(`  Modal closed: ${resetModalClosedFinal}`);
+    const resetModalHiddenAfterReset = !(await page6.isVisible("#reset-confirm-modal"));
+    console.log(`  Modal closed: ${resetModalHiddenAfterReset}`);
     console.log(`  localStorage.getItem('participants') is null: ${storageCleared}`);
     console.log(`  Instant empty table re-rendered: ${clearedRows} ticker rows (Expected: 0)`);
     console.log(`  HUD total delegates: ${clearedHudCount} (Expected: '0')`);
@@ -424,8 +417,7 @@ async function runTests() {
       confirmTitle.includes("Clear all leaderboard data?") &&
       resetModalHidden &&
       rowsPreserved === 100 &&
-      resetModalVisible2 &&
-      resetModalClosedFinal &&
+      resetModalHiddenAfterReset &&
       clearedRows === 0 &&
       clearedHudCount === "0" &&
       storageCleared

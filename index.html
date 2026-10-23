@@ -1977,11 +1977,11 @@
     async function checkExistingCloudSession(enteredPhone, enteredName) {
       if (!CONFIG.WEBHOOK_URL) return null;
 
-      const phoneVal = (enteredPhone || "").toString();
-      const cleanEnteredPhone = phoneVal.replace(/\D/g, '');
+      const rawInput = (enteredPhone || "").toString();
+      const enteredPhoneLast10 = rawInput.replace(/\D/g, '').slice(-10);
       const cleanEnteredName = (enteredName || "").toString().trim().toLowerCase();
 
-      if (!cleanEnteredPhone && !cleanEnteredName) return null;
+      if (!enteredPhoneLast10 && !cleanEnteredName) return null;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -1998,15 +1998,15 @@
           if (!p) return false;
 
           // 1. Phone match:
-          // Match against: p.phone && String(p.phone).replace(/\D/g, '') === cleanEnteredPhone && cleanEnteredPhone.length >= 8
-          if (cleanEnteredPhone && cleanEnteredPhone.length >= 8) {
+          if (enteredPhoneLast10 && enteredPhoneLast10.length >= 8) {
             const rawPhone = (p.phone !== undefined ? p.phone : (p.mobile !== undefined ? p.mobile : (p.user && (p.user.phone || p.user.mobile))));
             if (rawPhone) {
               const pPhoneClean = String(rawPhone).replace(/\D/g, '');
+              const pPhoneLast10 = pPhoneClean.slice(-10);
               if (
-                pPhoneClean === cleanEnteredPhone ||
-                pPhoneClean.endsWith(cleanEnteredPhone) ||
-                cleanEnteredPhone.endsWith(pPhoneClean)
+                pPhoneLast10 === enteredPhoneLast10 ||
+                pPhoneClean.endsWith(enteredPhoneLast10) ||
+                enteredPhoneLast10.endsWith(pPhoneClean)
               ) {
                 return true;
               }
@@ -2844,9 +2844,11 @@
                         document.getElementById('phone') || 
                         document.getElementById('playerPhone') || 
                         document.getElementById('mobile');
-        const enteredPhone = phoneEl ? phoneEl.value.replace(/\D/g, '') : '';
-        const cleanEnteredPhone = normalizePhone(enteredPhone);
-        const cleanPhone = cleanEnteredPhone;
+        const rawInput = phoneEl ? String(phoneEl.value) : '';
+        const enteredPhoneLast10 = rawInput.replace(/\D/g, '').slice(-10);
+        const enteredPhone = enteredPhoneLast10;
+        const cleanEnteredPhone = enteredPhoneLast10;
+        const cleanPhone = enteredPhoneLast10;
 
         const nameInput = document.getElementById('reg-name') || document.getElementById('playerName');
         const hospInput = document.getElementById('reg-hospital') || document.getElementById('playerHospital');
